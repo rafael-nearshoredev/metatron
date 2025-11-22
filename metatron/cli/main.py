@@ -4,13 +4,13 @@ from typing import Any, Dict, Optional
 import typer
 
 try:  # Support both installed package and local execution via `python -m cli`
-    from metatron.agents.closer import run_agent_interaction
+    from metatron.agents.closer import run_agent_interaction, Closer
     from metatron.agents.personality_adapter import PersonalityAdapter
     from metatron.agents.evaluator import Evaluator
     from metatron.agents.response_generator import ResponseGenerator
     from metatron.agents.sentiment_evaluator import SentimentAnalyst
 except ModuleNotFoundError:  # pragma: no cover - dev fallback
-    from agents.closer import run_agent_interaction  # type: ignore
+    from agents.closer import run_agent_interaction, Closer  # type: ignore
     from agents.personality_adapter import PersonalityAdapter  # type: ignore
     from agents.evaluator import Evaluator  # type: ignore
     from agents.response_generator import ResponseGenerator  # type: ignore
@@ -426,6 +426,109 @@ def complete_pipeline(
     typer.echo(f"\n📝 Respuesta original: {eval_result['response']}")
     typer.echo(f"\n✨ Respuesta adaptada (Andrés Bilbao): {adapted_text}")
     typer.echo("\n" + "=" * 80)
+
+
+@app.command(name="chat", help="Inicia una conversación interactiva con el Closer.")
+def chat(
+    stage: str = typer.Option("inicio", "--stage", "-s", help="Etapa inicial de la conversación."),
+    client_name: Optional[str] = typer.Option(None, "--client-name", help="Nombre del cliente."),
+):
+    """
+    Inicia una sesión de chat interactiva con el Closer.
+    Mantiene el contexto de la conversación entre mensajes.
+    """
+    try:
+        typer.echo("=" * 80)
+        typer.echo("💬 CHAT INTERACTIVO CON EL CLOSER")
+        typer.echo("=" * 80)
+        typer.echo("\nInicializando el Closer...")
+        
+        # Crear instancia de Closer (mantiene contexto)
+        closer = Closer()
+        
+        # Configurar información del cliente si se proporciona
+        if client_name:
+            closer.context.client_profile["name"] = client_name
+        
+        # Configurar etapa inicial
+        if stage:
+            closer.context.update_stage(stage)
+        
+        typer.echo(f"\n✅ Closer inicializado")
+        typer.echo(f"📊 Etapa: {closer.context.stage}")
+        typer.echo(f"👤 Cliente: {closer.context.client_profile.get('name', 'No especificado')}")
+        typer.echo("\n" + "=" * 80)
+        typer.echo("Escribe tus mensajes y presiona Enter.")
+        typer.echo("Comandos especiales:")
+        typer.echo("  /exit o /quit - Salir del chat")
+        typer.echo("  /reset - Reiniciar la conversación")
+        typer.echo("  /context - Ver el contexto actual")
+        typer.echo("  /stage <etapa> - Cambiar la etapa (inicio, negociacion, cierre)")
+        typer.echo("=" * 80 + "\n")
+        
+        message_count = 0
+        
+        while True:
+            try:
+                # Leer input del usuario
+                user_input = typer.prompt(f"\n[{message_count}] Tú", prompt_suffix=": ")
+                
+                # Procesar comandos especiales
+                if user_input.lower() in ["/exit", "/quit"]:
+                    typer.echo("\n👋 ¡Hasta luego!")
+                    break
+                
+                elif user_input.lower() == "/reset":
+                    closer.reset_context()
+                    message_count = 0
+                    typer.echo("\n🔄 Conversación reiniciada")
+                    continue
+                
+                elif user_input.lower() == "/context":
+                    typer.echo("\n📊 CONTEXTO ACTUAL:")
+                    typer.echo(f"  Etapa: {closer.context.stage}")
+                    typer.echo(f"  Mensajes: {len(closer.context.conversation_history)}")
+                    typer.echo(f"  Cliente: {json.dumps(closer.context.client_profile, indent=2, ensure_ascii=False)}")
+                    continue
+                
+                elif user_input.lower().startswith("/stage "):
+                    new_stage = user_input.split(" ", 1)[1].strip()
+                    closer.context.update_stage(new_stage)
+                    typer.echo(f"\n✅ Etapa cambiada a: {new_stage}")
+                    continue
+                
+                # Procesar mensaje normal
+                typer.echo("\n🤔 Procesando...")
+                
+                result = closer.process_message(
+                    incoming_text=user_input,
+                    stage=closer.context.stage
+                )
+                
+                message_count += 1
+                
+                # Mostrar respuesta
+                typer.echo(f"\n[{message_count}] Closer: {result['adapted_response']}")
+                
+                # Mostrar info adicional
+                sentiment = result['sentiment_analysis']
+                typer.echo(f"\n💭 Sentimiento detectado: {len(sentiment.get('sentiments', []))} fragmentos")
+                typer.echo(f"🎯 Etapa actual: {closer.context.stage}")
+                
+            except KeyboardInterrupt:
+                typer.echo("\n\n👋 Chat interrumpido. ¡Hasta luego!")
+                break
+            except EOFError:
+                typer.echo("\n\n👋 ¡Hasta luego!")
+                break
+                
+    except ValueError as e:
+        typer.echo(f"\n❌ Error: {e}", err=True)
+        typer.echo("Por favor configura OPENAI_API_KEY en tu archivo .env", err=True)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        typer.echo(f"\n❌ Error inesperado: {e}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command(help="Ejecuta el agente closer con el texto indicado.")

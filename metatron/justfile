@@ -2,6 +2,18 @@
 ping:
     uv run python -m cli ping
 
+# Start interactive chat with the Closer
+chat:
+    uv run python -m cli chat
+
+# Start chat with custom stage
+chat-stage STAGE:
+    uv run python -m cli chat --stage "{{STAGE}}"
+
+# Start chat with client name and stage
+chat-full CLIENT_NAME STAGE:
+    uv run python -m cli chat --client-name "{{CLIENT_NAME}}" --stage "{{STAGE}}"
+
 # Adapt text to personality profile
 adapt TEXT:
     uv run python -m cli adapt "{{TEXT}}"

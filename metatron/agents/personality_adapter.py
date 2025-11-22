@@ -59,7 +59,7 @@ Texto final:
         response = self.client.chat.completions.create(
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
+            temperature=0.8,
         )
 
         logging.info("Received personality-adapted response")
