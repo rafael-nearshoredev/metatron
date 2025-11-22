@@ -6,6 +6,11 @@ serve:
 serve-uvicorn:
     uv run python -m metatron.main
 
+# Run the voice agent worker
+voice-agent:
+    uv run python -m metatron.agents.voice_agent
+
+
 # Run the ping command
 ping:
     uv run python -m cli ping
