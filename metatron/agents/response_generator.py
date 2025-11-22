@@ -211,68 +211,6 @@ Selecciona la herramienta correcta según este contexto:
         return tool_name
 
 
-    def seduce_lead(
-        self,
-        sentiment_analysis,
-        client_context,
-        product_context,
-        stage,
-        *,
-        conversation_history=None,
-        salesman_context=None,
-    ):
-        """
-        Conecta el producto con el perfil del cliente mostrando beneficios,
-        ventajas claras y por qué es ideal para él.
-        Debe ser persuasivo pero conversacional.
-        """
-        history_snippet = self._format_recent_messages(conversation_history)
-        salesman_profile = self._format_salesman_profile(salesman_context)
-
-        system_msg = f"""
-Eres un vendedor persuasivo. Tu objetivo es "seducir" comercialmente al cliente,
-explicando por qué este producto es perfecto para él.
-
-### DEFINICIÓN DE SEDUCIR AQUÍ ###
-- No es sexual.
-- Es resaltar beneficios.
-- Conectar el producto con el cliente.
-- Mostrar por qué le conviene.
-- Ser cálido, claro y convincente.
-
-### INSTRUCCIONES ###
-Genera exactamente 3 opciones en JSON:
-- directa: vende el beneficio principal directo
-- consultiva: explora su necesidad y cómo encaja
-- empatica: resalta comprensión del cliente + beneficio clave
-
-NO repitas beneficios si ya se dijeron previamente.
-NO inventes beneficios que no están en el contexto.
-Mantén coherencia con el historial reciente de la conversación.
-
-### CONTEXTO DEL PRODUCTO ###
-{product_context}
-
-### CONTEXTO DEL CLIENTE ###
-{client_context}
-
-### PERFIL DEL VENDEDOR ###
-{salesman_profile}
-
-### CONTEXTO DE CONVERSACIÓN ###
-{history_snippet}
-
-Devuelve solo JSON.
-"""
-
-        fragments = [f['text'] for f in sentiment_analysis.get("sentiments", [])]
-        user_msg = f"""### Fragmentos previos ###
-{fragments}
-
-Genera las 3 opciones:"""
-
-        return self._call_openai(system_msg, user_msg)
-
     # ---------------------------
     # Herramientas / técnicas de venta
     # ---------------------------
@@ -648,24 +586,51 @@ Genera las opciones:"""
                 if result_text.startswith("json"):
                     result_text = result_text[4:].strip()
             
-            options = json.loads(result_text)
-            options = self._normalize_options(options)
-
-            # Validate structure
-            if not isinstance(options, list):
-                raise ValueError(f"Expected list, got {type(options).__name__}")
-            if len(options) != 3:
-                raise ValueError(f"Expected 3 options, got {len(options)}")
+            parsed_data = json.loads(result_text)
             
-            # Validate each option has required fields
-            for opt in options:
-                if not isinstance(opt, dict):
-                    raise ValueError(f"Option is not a dict: {opt}")
-                if "id" not in opt or "intent" not in opt or "text" not in opt:
-                    raise ValueError(f"Option missing required fields: {opt}")
-            
-            logger.debug(f"Successfully parsed {len(options)} options from Groq")
-            return options
+            # Handle both dict and list formats from Groq
+            if isinstance(parsed_data, dict):
+                # Groq returned dict format: {"directa": "text", "consultiva": "text", "empatica": "text"}
+                # Convert to expected list format
+                intent_mapping = {
+                    "directa": "cierre",
+                    "consultiva": "pregunta",
+                    "empatica": "confianza"
+                }
+                
+                options = []
+                for key in ["directa", "consultiva", "empatica"]:
+                    if key in parsed_data:
+                        options.append({
+                            "id": key,
+                            "intent": intent_mapping.get(key, "general"),
+                            "text": parsed_data[key]
+                        })
+                
+                if len(options) != 3:
+                    raise ValueError(f"Expected 3 options (directa, consultiva, empatica), got {len(options)}")
+                
+                logger.debug(f"Converted dict format to {len(options)} options")
+                return options
+                
+            elif isinstance(parsed_data, list):
+                # Groq returned list format (expected)
+                options = parsed_data
+                
+                if len(options) != 3:
+                    raise ValueError(f"Expected 3 options, got {len(options)}")
+                
+                # Validate each option has required fields
+                for opt in options:
+                    if not isinstance(opt, dict):
+                        raise ValueError(f"Option is not a dict: {opt}")
+                    if "id" not in opt or "intent" not in opt or "text" not in opt:
+                        raise ValueError(f"Option missing required fields: {opt}")
+                
+                logger.debug(f"Successfully parsed {len(options)} options from Groq")
+                return options
+            else:
+                raise ValueError(f"Expected list or dict, got {type(parsed_data).__name__}")
             
         except json.JSONDecodeError as e:
             logger.warning(f"JSON decode error: {e}")
