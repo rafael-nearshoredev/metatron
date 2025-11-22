@@ -140,12 +140,22 @@ Selecciona la herramienta adecuada:"""
         """
         system_msg = f"""Eres un asistente experto en ventas. El cliente tiene dudas o preocupaciones.
 
+
+
+### INSTRUCCIONES ###
+Genera 3 opciones de respuesta persuasivas. Responde concretamente la pregunta del cliente y menciona como eso le puede generar valor usando el contexto del cliente
+Devuelve JSON exacto con 3 opciones usando estos IDs: directa, consultiva, empatica.
+
 ### INFORMACIÓN DEL PRODUCTO ###
 {product_context}
 
-### INSTRUCCIONES ###
-Genera 3 opciones de respuesta persuasivas.
-Devuelve JSON exacto con 3 opciones usando estos IDs: directa, consultiva, empatica."""
+##CONTEXTO DEL CLIENTE
+
+ {client_context}
+
+"""
+     
+        
 
         user_msg = f"""### FRAGMENTOS CON PROBLEMAS ###
 {[f['text'] for f in sentiment_analysis.get('sentiments', []) if f['label'] in ('NEG','NEU')]}
@@ -316,7 +326,8 @@ Genera las opciones:"""
                     result_text = result_text[4:].strip()
             
             options = json.loads(result_text)
-            
+            options = self._normalize_options(options)
+
             # Validate structure
             if not isinstance(options, list):
                 raise ValueError(f"Expected list, got {type(options).__name__}")
@@ -350,3 +361,28 @@ Genera las opciones:"""
             {"id": "consultiva", "intent": "pregunta", "text": "¿Puedes contarme más sobre tus prioridades?"},
             {"id": "empatica", "intent": "confianza", "text": "Entiendo tus preocupaciones, estoy aquí para ayudarte."}
         ]
+
+    def _normalize_options(self, options):
+        """
+        Ensure Groq responses are always a list of option dicts.
+        """
+        if isinstance(options, dict):
+            intent_map = {
+                "directa": "cierre",
+                "consultiva": "pregunta",
+                "empatica": "confianza",
+            }
+            normalized = []
+            ordered_keys = ["directa", "consultiva", "empatica"]
+            ordered_keys += [k for k in options.keys() if k not in ordered_keys]
+            for option_id in ordered_keys:
+                text = options.get(option_id)
+                if text is None:
+                    continue
+                normalized.append({
+                    "id": option_id,
+                    "intent": intent_map.get(option_id, "respuesta"),
+                    "text": text,
+                })
+            options = normalized
+        return options
