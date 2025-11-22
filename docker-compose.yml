@@ -46,6 +46,24 @@ services:
     networks:
       - metatron-network
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: metatron-frontend
+    environment:
+      VITE_LIVEKIT_URL: ${LIVEKIT_URL:-wss://moritahr-8qv2ck7z.livekit.cloud}
+      VITE_APPLICATION_SERVER_URL: http://metatron:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - metatron
+    networks:
+      - metatron-network
+
 volumes:
   postgres_data:
     driver: local

@@ -1,0 +1,30 @@
+/**
+ * Global styles and color variables for the application
+ * All colors should be defined here as CSS custom properties
+ */
+
+:root {
+  /* Primary colors - Solid Blue */
+  --color-primary: #2563eb;
+  --color-primary-dark: #1e40af;
+  
+  /* Basic colors */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  
+  /* You can add more color categories as needed */
+  /* --color-success: #28a745; */
+  /* --color-warning: #ffc107; */
+  /* --color-error: #dc3545; */
+  /* --color-info: #17a2b8; */
+  
+  /* Text colors */
+  /* --color-text-primary: #333333; */
+  /* --color-text-secondary: #666666; */
+  
+  /* Background colors */
+  /* --color-background-light: #f8f9fa; */
+  /* --color-background-dark: #343a40; */
+}
+
+/* Global styles can be added here if needed */

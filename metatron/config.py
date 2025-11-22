@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="development", alias="ENVIRONMENT")
     
     # LiveKit settings
+    livekit_project_id: Optional[str] = Field(default=None, alias="LIVEKIT_PROJECT_ID")
     livekit_url: Optional[str] = Field(default=None, alias="LIVEKIT_URL")
     livekit_api_key: Optional[str] = Field(default=None, alias="LIVEKIT_API_KEY")
     livekit_api_secret: Optional[str] = Field(default=None, alias="LIVEKIT_API_SECRET")
@@ -82,6 +83,7 @@ def load_settings() -> Settings:
     print(Fore.YELLOW + f"OpenAI API Key: {'***' if settings.openai_api_key else 'Not set'}")
     print(Fore.YELLOW + f"Groq API Key: {'***' if settings.groq_api_key else 'Not set'}")
     print(Fore.YELLOW + f"Groq Model: {settings.groq_model}")
+    print(Fore.YELLOW + f"LiveKit Project ID: {'***' if settings.livekit_project_id else 'Not set'}")
     print(Fore.YELLOW + f"LiveKit URL: {settings.livekit_url if settings.livekit_url else 'Not set'}")
     print(Fore.YELLOW + f"LiveKit API Key: {'***' if settings.livekit_api_key else 'Not set'}")
     print(Fore.YELLOW + f"MiniMax API Key: {'***' if settings.minimax_api_key else 'Not set'}\n")
