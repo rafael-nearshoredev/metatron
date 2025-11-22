@@ -76,6 +76,7 @@ class MakeCallRequest(BaseModel):
     """Request schema for making an outbound call."""
     phone_number: str = Field(..., description="Phone number to call in E.164 format (e.g., +1234567890)")
     room_name: Optional[str] = Field(default=None, description="Optional room name (auto-generated if not provided)")
+    voice_id: Optional[str] = Field(default=None, description="ElevenLabs voice ID for the agent (uses default if not provided)")
     metadata: Optional[dict] = Field(default=None, description="Optional metadata for the call")
 
 

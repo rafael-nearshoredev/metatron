@@ -134,6 +134,18 @@ async def entrypoint(ctx: JobContext):
     # Connect to the room
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     
+    # Extract voice_id from room metadata if provided
+    voice_id = None
+    if ctx.room.metadata:
+        try:
+            import json
+            room_meta = json.loads(ctx.room.metadata)
+            voice_id = room_meta.get("voice_id")
+            if voice_id:
+                logger.info(f"Using custom voice_id from room metadata: {voice_id}")
+        except Exception as e:
+            logger.warning(f"Failed to parse room metadata: {e}")
+    
     # Wait for participant
     participant = await ctx.wait_for_participant()
     
@@ -174,9 +186,12 @@ async def entrypoint(ctx: JobContext):
     logger.info("Creating voice agent session...")
     
     # Configure ElevenLabs TTS for Spanish using official LiveKit plugin
-    # Voice IDs: 
+    # Default voice IDs: 
     #   - "ThT5KcBeYPX3keUQqHPh" = Matias (Spanish male)
     #   - "ODq5zmih8GrVes37Dizd" = Patrick (multilingual male)
+    
+    # Use custom voice_id from room metadata, or fall back to default
+    selected_voice_id = voice_id or "ThT5KcBeYPX3keUQqHPh"  # Default: Spanish male voice (Matias)
     
     # Configure voice settings for natural, expressive speech
     voice_settings = VoiceSettings(
@@ -187,13 +202,13 @@ async def entrypoint(ctx: JobContext):
     )
     
     elevenlabs_tts = elevenlabs.TTS(
-        voice_id="ThT5KcBeYPX3keUQqHPh",  # Spanish male voice (Matias)
+        voice_id=selected_voice_id,  # Use custom or default voice
         model="eleven_turbo_v2_5",  # Fast, high-quality model with low latency
         api_key=settings.elevenlabs_api_key,
         language="es",  # Spanish
         voice_settings=voice_settings,  # Voice customization settings
     )
-    logger.info("ElevenLabs TTS configured with Spanish voice (Matias)")
+    logger.info(f"ElevenLabs TTS configured with voice_id: {selected_voice_id}")
     
     session = voice.AgentSession(
         stt=openai.STT(model="whisper-1", language="es"),
