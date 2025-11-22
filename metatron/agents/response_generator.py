@@ -127,33 +127,36 @@ class ResponseGenerator:
         salesman_profile = self._format_salesman_profile(salesman_context)
 
         system_message = """
-Eres un asistente experto en ventas por teléfono. Tienes que tomar el contexto de la conversacion y definir que herramienta es la más
-adecuada para llevar al cliente a una venta. Sí el cliente muestra interes en comprar selecciona close_sale. En caso de que el cliente
-muestre dudas sobre adquirir el producto o declare que no esta seguro si el producto es para si intenta seduce_lead, si el usuario 
-demuestra que le interesa pero quiere posponer la venta usa add_scarcity en caso de que el cliente pide más detalles usa add_details.
+Eres un asistente experto en ventas por teléfono. Tu tarea es seleccionar la herramienta más adecuada para llevar al cliente hacia la venta, basándote únicamente en:
+	•	Contexto del cliente
+	•	Contexto del producto
+	•	Etapa del funnel: intro, pitch, cierre
+	•	Análisis de sentimiento
+	•	Historial reciente de conversación
 
+Reglas de selección:
+	1.	close_sale → Si el cliente muestra interés claro en comprar.
+	2.	seduce_lead → Si el cliente duda o no está seguro de que el producto sea adecuado.
+	3.	add_scarcity → Si el cliente está interesado pero quiere posponer la compra.
+	4.	add_details → Si el cliente pide más información o detalles.
+	5.	greet_user → Solo si no se ha enviado un saludo previamente y es un inicio o presentación.
+	6.	default_tool → Si ninguna de las condiciones anteriores aplica.
 
-Tu tarea es elegir la herramienta correcta basándote solo en:
-- contexto del cliente
-- contexto del producto
-- etapa del funnel: intro, pitch, cierre
-- análisis de sentimiento
-- historial de conversación reciente
+Herramientas disponibles:
+	1.	greet_user → Saludo o presentación inicial.
+	2.	seduce_lead → Conectar producto con necesidades del cliente.
+	3.	fix_doubts → Resolver dudas, miedos o confusiones.
+	4.	add_details → Proporcionar información adicional solicitada.
+	5.	add_scarcity → Crear urgencia si el cliente está cerca de decidir.
+	6.	search_offers → Buscar ofertas específicas si el cliente lo solicita.
+	7.	close_sale → Cerrar la venta cuando el cliente está listo.
+	8.	default_tool → Usar como fallback si nada aplica.
 
-### HERRAMIENTAS DISPONIBLES ###
-1. greet_user        → Si parece inicio, presentación o saludo.
-2. seduce_lead       → Conectar producto ↔ cliente (beneficios alineados al perfil).
-3. fix_doubts        → Resolver dudas, miedos, confusiones.
-4. add_details       → Ampliar detalles solicitados.
-5. add_scarcity      → Generar urgencia si está cerca del cierre.
-6. search_offers     → Buscar ofertas cuando lo piden.
-7. close_sale        → Cuando el cliente muestra disposición clara a comprar.
-8. default_tool      → Si nada aplica.
+Instrucciones:
+	•	Piensa como un closer profesional.
+	•	Analiza señales del cliente: interés, dudas, urgencia, intención de compra.
+	•	Devuelve solo el nombre exacto de la herramienta sin explicaciones ni comentarios adicionales.
 
-### INSTRUCCIONES ###
-- Piensa como un closer profesional.
-- Analiza señales del cliente, dudas, intención, urgencia, interés.
-- Devuelve SOLO el nombre exacto de la herramienta.
 """
 
         user_message = f"""
@@ -210,6 +213,70 @@ Selecciona la herramienta correcta según este contexto:
         logger.info(f"✔️ Herramienta final seleccionada: {tool_name}")
         return tool_name
 
+
+    def seduce_lead(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
+        """
+        Conecta el producto con el perfil del cliente mostrando beneficios,
+        ventajas claras y por qué es ideal para él.
+        Debe ser persuasivo pero conversacional.
+        """
+        history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
+
+        system_msg = f"""
+Eres un vendedor persuasivo. Tu objetivo es "seducir" comercialmente al cliente,
+explicando por qué este producto es perfecto para él.
+
+### DEFINICIÓN DE SEDUCIR AQUÍ ###
+- No es sexual.
+- Es resaltar beneficios.
+- Conectar el producto con el cliente.
+- Mostrar por qué le conviene.
+- Ser cálido, claro y convincente.
+
+### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
+Genera exactamente 3 opciones en JSON:
+- directa: vende el beneficio principal directo
+- consultiva: explora su necesidad y cómo encaja
+- empatica: resalta comprensión del cliente + beneficio clave
+
+NO repitas beneficios si ya se dijeron previamente.
+NO inventes beneficios que no están en el contexto.
+Mantén coherencia con el historial reciente de la conversación.
+
+### CONTEXTO DEL PRODUCTO ###
+{product_context}
+
+### CONTEXTO DEL CLIENTE ###
+{client_context}
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
+### CONTEXTO DE CONVERSACIÓN ###
+{history_snippet}
+
+Devuelve solo JSON.
+"""
+
+        fragments = [f['text'] for f in sentiment_analysis.get("sentiments", [])]
+        user_msg = f"""### Fragmentos previos ###
+{fragments}
+
+Genera las 3 opciones:"""
+
+        return self._call_openai(system_msg, user_msg)
 
     # ---------------------------
     # Herramientas / técnicas de venta
@@ -294,6 +361,8 @@ Genera las 3 opciones:"""
         system_msg = f"""Eres un asistente experto en ventas. El cliente tiene dudas o preocupaciones y ya llevas una conversación previa con él.
 
 ### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
 Genera 3 opciones de respuesta persuasivas. Responde concretamente la pregunta del cliente y menciona como eso le puede generar valor usando el contexto del cliente
 Devuelve JSON exacto con 3 opciones usando estos IDs: directa, consultiva, empatica.
 Mantén coherencia con las respuestas anteriores y evita repetir ideas textualmente.
@@ -343,6 +412,8 @@ Genera las 3 opciones:"""
 ]
 
 ### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
 - directa: saludo profesional y breve
 - consultiva: saludo interactivo preguntando cómo se encuentra
 - empatica: saludo cálido y cercano
@@ -391,6 +462,8 @@ Genera los saludos:"""
 {salesman_profile}
 
 ### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
 1. Mantén un estilo conversacional y cercano.
 2. Persuade al cliente a seguir los próximos pasos definidos arriba.
 3. Devuelve exactamente 3 opciones en formato JSON con IDs:
@@ -432,6 +505,8 @@ Genera las 3 opciones de cierre:"""
 {product_context}
 
 ### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
 Genera 3 opciones persuasivas.
 Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
 
@@ -466,6 +541,8 @@ Usa este historial reciente para mantener coherencia:
 {product_context}
 
 ### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
 Genera 3 opciones persuasivas con urgencia/escasez.
 Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
 
@@ -501,6 +578,8 @@ Historial reciente:
 {product_context}
 
 ### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
 Genera 3 opciones persuasivas basadas en ofertas.
 Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
 
@@ -533,8 +612,10 @@ Historial reciente:
 {product_context}
 
 ### INSTRUCCIONES ###
+Lee el contexto del historial y genera respuestas que no sean repetitivas ni pidan la misma información.
+Guía la conversación para acercar al cliente al producto, sus beneficios y al cierre.
 Genera 3 opciones de respuesta persuasivas.
-Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
+Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica. 
 
 ### PERFIL DEL VENDEDOR ###
 {salesman_profile}
