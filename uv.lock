@@ -776,6 +776,18 @@ wheels = [
 ]
 
 [[package]]
+name = "livekit-plugins-elevenlabs"
+version = "1.3.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "livekit-agents", extra = ["codecs"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/41/1b/93393e645139e929df143760f0b894913678da55f99af076f2b0d304b78f/livekit_plugins_elevenlabs-1.3.3.tar.gz", hash = "sha256:6d81dd4bc0418a55ef390837ea7e5103851740e1b9fa1e96625fcd4a165fe849", size = 12206, upload-time = "2025-11-19T21:20:57.737Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/ae/3e57c096e433fa5738e2fd217a6db25e78b95213e79b922d706d29e260f9/livekit_plugins_elevenlabs-1.3.3-py3-none-any.whl", hash = "sha256:97d1c9eb61c5c33415c3a4222a2bb0c4b5fdd765201673911fc8e5cf9d1eb709", size = 14048, upload-time = "2025-11-19T21:20:56.815Z" },
+]
+
+[[package]]
 name = "livekit-plugins-openai"
 version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
@@ -899,6 +911,7 @@ dependencies = [
     { name = "httpx" },
     { name = "livekit" },
     { name = "livekit-agents" },
+    { name = "livekit-plugins-elevenlabs" },
     { name = "livekit-plugins-openai" },
     { name = "livekit-plugins-silero" },
     { name = "openai" },
@@ -919,6 +932,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "livekit", specifier = ">=0.17.0" },
     { name = "livekit-agents", specifier = ">=0.10.0" },
+    { name = "livekit-plugins-elevenlabs", specifier = ">=1.3.3" },
     { name = "livekit-plugins-openai", specifier = ">=0.8.0" },
     { name = "livekit-plugins-silero", specifier = ">=0.7.0" },
     { name = "openai", specifier = ">=2.8.1" },

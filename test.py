@@ -16,7 +16,7 @@ from rich.table import Table
 # ============================================================================
 
 # Your phone number to call (E.164 format: +1234567890)
-TO_NUMBER = "+573118718353"  # ⚠️ CHANGE THIS TO YOUR PHONE NUMBER
+TO_NUMBER = "+573017063936"  # ⚠️ CHANGE THIS TO YOUR PHONE NUMBER
 
 # API endpoint
 API_URL = "http://localhost:5885"

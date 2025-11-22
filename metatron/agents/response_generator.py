@@ -667,24 +667,51 @@ Genera las opciones:"""
                 if result_text.startswith("json"):
                     result_text = result_text[4:].strip()
             
-            options = json.loads(result_text)
-            options = self._normalize_options(options)
-
-            # Validate structure
-            if not isinstance(options, list):
-                raise ValueError(f"Expected list, got {type(options).__name__}")
-            if len(options) != 3:
-                raise ValueError(f"Expected 3 options, got {len(options)}")
+            parsed_data = json.loads(result_text)
             
-            # Validate each option has required fields
-            for opt in options:
-                if not isinstance(opt, dict):
-                    raise ValueError(f"Option is not a dict: {opt}")
-                if "id" not in opt or "intent" not in opt or "text" not in opt:
-                    raise ValueError(f"Option missing required fields: {opt}")
-            
-            logger.debug(f"Successfully parsed {len(options)} options from Groq")
-            return options
+            # Handle both dict and list formats from Groq
+            if isinstance(parsed_data, dict):
+                # Groq returned dict format: {"directa": "text", "consultiva": "text", "empatica": "text"}
+                # Convert to expected list format
+                intent_mapping = {
+                    "directa": "cierre",
+                    "consultiva": "pregunta",
+                    "empatica": "confianza"
+                }
+                
+                options = []
+                for key in ["directa", "consultiva", "empatica"]:
+                    if key in parsed_data:
+                        options.append({
+                            "id": key,
+                            "intent": intent_mapping.get(key, "general"),
+                            "text": parsed_data[key]
+                        })
+                
+                if len(options) != 3:
+                    raise ValueError(f"Expected 3 options (directa, consultiva, empatica), got {len(options)}")
+                
+                logger.debug(f"Converted dict format to {len(options)} options")
+                return options
+                
+            elif isinstance(parsed_data, list):
+                # Groq returned list format (expected)
+                options = parsed_data
+                
+                if len(options) != 3:
+                    raise ValueError(f"Expected 3 options, got {len(options)}")
+                
+                # Validate each option has required fields
+                for opt in options:
+                    if not isinstance(opt, dict):
+                        raise ValueError(f"Option is not a dict: {opt}")
+                    if "id" not in opt or "intent" not in opt or "text" not in opt:
+                        raise ValueError(f"Option missing required fields: {opt}")
+                
+                logger.debug(f"Successfully parsed {len(options)} options from Groq")
+                return options
+            else:
+                raise ValueError(f"Expected list or dict, got {type(parsed_data).__name__}")
             
         except json.JSONDecodeError as e:
             logger.warning(f"JSON decode error: {e}")

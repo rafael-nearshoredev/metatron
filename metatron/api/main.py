@@ -573,6 +573,16 @@ async def make_outbound_call(request: MakeCallRequest) -> MakeCallResponse:
         
         logger.info(f"Initiating outbound call to {phone} in room {room_name}")
         
+        # Prepare room metadata with voice_id if provided
+        room_metadata = {}
+        if request.voice_id:
+            room_metadata["voice_id"] = request.voice_id
+            logger.info(f"Using custom voice_id: {request.voice_id}")
+        
+        # Merge with any additional metadata from request
+        if request.metadata:
+            room_metadata.update(request.metadata)
+        
         # Create LiveKit API client
         lk_api = livekit_api.LiveKitAPI(
             settings.livekit_url,
@@ -580,12 +590,14 @@ async def make_outbound_call(request: MakeCallRequest) -> MakeCallResponse:
             settings.livekit_api_secret,
         )
         
-        # Create room first
+        # Create room first with metadata
+        import json
         await lk_api.room.create_room(
             livekit_api.CreateRoomRequest(
                 name=room_name,
                 empty_timeout=600,  # 10 minutes
                 max_participants=2,  # Phone participant + Agent
+                metadata=json.dumps(room_metadata) if room_metadata else "",
             )
         )
         
