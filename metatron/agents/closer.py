@@ -4,20 +4,12 @@ Versión para CPU, español, con logging detallado.
 """
 
 import json
-import logging
 import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
-# ---------------------------
-# CONFIGURAR LOGGING GLOBAL
-# ---------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="🟦 [%(levelname)s] %(message)s"
-)
-
-logger = logging.getLogger(__name__)
+from utils.logger import logger
+from agents.evaluator import Evaluator
 
 # ---------------------------
 # MODELO HF PARA ESPAÑOL
@@ -171,45 +163,6 @@ class OptionsGenerator:
 
     def _opt_empatica(self, fragments):
         return f"Te entiendo completamente respecto a «{self._first(fragments)}». Estoy aquí para ayudarte paso a paso."
-
-
-# ---------------------------
-# EVALUADOR
-# ---------------------------
-class Evaluator:
-    """
-    Ajusta la puntuación de cada opción según perfil del cliente y etapa.
-    """
-
-    def evaluate(self, client_profile, product_info, stage, options):
-        logger.info("➡️  Etapa 4: Evaluando opciones…")
-
-        scored = []
-        temper = client_profile.get("temperament", "neutral")
-
-        for opt in options:
-            score = opt["confidence_est"]
-
-            if stage == "cierre" and opt["id"] == "directa":
-                score += 0.15
-
-            if temper == "decisive" and opt["id"] == "directa":
-                score += 0.15
-
-            if temper == "cautious" and opt["id"] == "empatica":
-                score += 0.15
-
-            score = max(0, min(1, score))
-            opt["adjusted_score"] = score
-            scored.append(opt)
-
-        scored_sorted = sorted(scored, key=lambda x: x["adjusted_score"], reverse=True)
-
-        best = scored_sorted[0]
-
-        logger.info(f"   → Mejor opción: {best['id']} ({best['adjusted_score']:.2f})")
-
-        return {"best": best, "ordered": scored_sorted}
 
 
 # ---------------------------

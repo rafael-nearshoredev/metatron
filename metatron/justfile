@@ -1,3 +1,23 @@
 # Run the ping command
 ping:
     uv run python -m cli ping
+
+# Adapt text to personality profile
+adapt TEXT:
+    uv run python -m cli adapt "{{TEXT}}"
+
+# Run the interact command with default parameters
+interact TEXT:
+    uv run python -m cli interact "{{TEXT}}"
+
+# Run interact with custom stage and personality
+interact-custom TEXT STAGE PERSONALITY:
+    uv run python -m cli interact "{{TEXT}}" --stage "{{STAGE}}" --personality "{{PERSONALITY}}"
+
+# Run interact with full options (including JSON profiles)
+interact-full TEXT STAGE PERSONALITY CLIENT_PROFILE PRODUCT_INFO:
+    uv run python -m cli interact "{{TEXT}}" --stage "{{STAGE}}" --personality "{{PERSONALITY}}" --client-profile '{{CLIENT_PROFILE}}' --product-info '{{PRODUCT_INFO}}'
+
+# Evaluate three response options with the Evaluator
+evaluate OPTION_A OPTION_B OPTION_C:
+    uv run python -m cli evaluate --option-a "{{OPTION_A}}" --option-b "{{OPTION_B}}" --option-c "{{OPTION_C}}"
