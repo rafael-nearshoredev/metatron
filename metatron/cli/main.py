@@ -305,7 +305,11 @@ def full_pipeline(
     ]
 
     evaluator = Evaluator(openai_api_key=api_key)
-    eval_result = evaluator.evaluate(conversation_history=conversation_history, options=options)
+    eval_result = evaluator.evaluate(
+        conversation_history=conversation_history,
+        options=options,
+        full_context={"conversation_history": conversation_history},
+    )
 
     typer.echo("\n✅ Mejor opción seleccionada:")
     typer.echo(json.dumps(eval_result, indent=2, ensure_ascii=False))

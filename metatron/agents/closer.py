@@ -203,7 +203,8 @@ class Closer:
         logger.info("⚖️ Evaluando opciones...")
         evaluation = self.evaluator.evaluate(
             conversation_history=self.context.conversation_history,
-            options=options
+            options=options,
+            full_context=self.context.to_dict(),
         )
 
         # -----------------------------------------------------------------

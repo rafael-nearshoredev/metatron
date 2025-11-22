@@ -24,7 +24,7 @@ class Evaluator:
     - Seleccionar la mejor opción sin alterar el texto original
     """
 
-    def __init__(self, openai_api_key: str, model=DEFAULT_MODEL, temperature=0.7):
+    def __init__(self, openai_api_key: str, model=DEFAULT_MODEL, temperature=0.5):
         self.client = OpenAI(
             base_url=GROQ_BASE_URL,
             api_key=openai_api_key
