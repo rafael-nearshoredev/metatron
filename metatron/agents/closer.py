@@ -88,20 +88,16 @@ def evaluate_stage_transition(context: GlobalConversationContext, sentiment_data
         if any(x in f for f in fragments for x in ["precio", "cómo pago", "quiero", "compro", "me sirve"]):
             return "cierre"
 
-    # No hay transición
     return current_stage
 
 
-# =====================================================================
-# 3. CLOSER: ORQUESTADOR PRINCIPAL
-# =====================================================================
 
 class Closer:
     """
     Orquestador principal que coordina todos los agentes y mantiene el contexto global.
     """
 
-    def __init__(self, load_context_from_files: bool = True):
+    def __init__(self, load_context_from_files: bool = True, enable_sentiment: bool = False):
         """
         Inicializa el Closer con todos los agentes necesarios.
         """
@@ -111,7 +107,10 @@ class Closer:
                 "Por favor configura la variable de entorno GROQ_API_KEY en tu archivo .env"
             )
 
-        self.sentiment_analyst = SentimentAnalyst(openai_api_key=settings.groq_api_key)
+        self.use_sentiment = enable_sentiment
+        self.sentiment_analyst = None
+        if self.use_sentiment:
+            self.sentiment_analyst = SentimentAnalyst(openai_api_key=settings.groq_api_key)
         self.response_generator = ResponseGenerator(openai_api_key=settings.groq_api_key)
         self.evaluator = Evaluator(openai_api_key=settings.groq_api_key)
         self.personality_adapter = PersonalityAdapter(openai_api_key=settings.groq_api_key)
@@ -164,28 +163,22 @@ class Closer:
         if stage:
             self.context.update_stage(stage)
 
-        # -----------------------------------------------------------------
-        # PASO 1: ANALIZAR SENTIMIENTO
-        # -----------------------------------------------------------------
 
-        logger.info("📊 Analizando sentimiento...")
-        sentiment_analysis = self.sentiment_analyst.analyze(incoming_text)
+        if self.use_sentiment and self.sentiment_analyst:
+            logger.info("📊 Analizando sentimiento...")
+            sentiment_analysis = self.sentiment_analyst.analyze(incoming_text)
+            self.context.add_message("cliente", incoming_text, sentiment_analysis)
+        else:
+            logger.info("🔕 Saltando análisis de sentimiento (modo sin sentimiento).")
+            sentiment_analysis = self._build_default_sentiment(incoming_text)
+            self.context.add_message("cliente", incoming_text)
 
-        self.context.add_message("cliente", incoming_text, sentiment_analysis)
-
-        # -----------------------------------------------------------------
-        # PASO 2: EVALUAR SI DEBEMOS PASAR A LA SIGUIENTE FASE
-        # -----------------------------------------------------------------
 
         new_stage = evaluate_stage_transition(self.context, sentiment_analysis)
 
         if new_stage != self.context.stage:
             logger.info(f"🏆 Transición de etapa detectada → {new_stage}")
-            self.context.update_stage(new_stage)
-
-        # -----------------------------------------------------------------
-        # PASO 3: GENERAR OPCIONES
-        # -----------------------------------------------------------------
+            self.context.update_stage(new_stage) 
 
         logger.info("💡 Generando opciones...")
         options = self.response_generator.generate_response(
@@ -238,6 +231,21 @@ class Closer:
             "original_response": evaluation["response"],
             "adapted_response": adapted_response,
             "context": self.context.to_dict()
+        }
+
+    def _build_default_sentiment(self, text: str) -> Dict[str, Any]:
+        """
+        Crea un resultado de sentimiento neutro cuando se omite el análisis real.
+        """
+        entry = {
+            "text": text,
+            "label": "NEU",
+            "score": 0.5,
+        }
+        return {
+            "sentiments": [entry],
+            "fragments": [entry],
+            "personality_insight": "Análisis de sentimiento omitido; usando contexto neutro.",
         }
 
     # -----------------------------------------------------------------
