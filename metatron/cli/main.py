@@ -9,12 +9,14 @@ try:  # Support both installed package and local execution via `python -m cli`
     from metatron.agents.evaluator import Evaluator
     from metatron.agents.response_generator import ResponseGenerator
     from metatron.agents.sentiment_evaluator import SentimentAnalyst
+    from metatron.utils.file_reader import get_salesman_context
 except ModuleNotFoundError:  # pragma: no cover - dev fallback
     from agents.closer import run_agent_interaction, Closer  # type: ignore
     from agents.personality_adapter import PersonalityAdapter  # type: ignore
     from agents.evaluator import Evaluator  # type: ignore
     from agents.response_generator import ResponseGenerator  # type: ignore
     from agents.sentiment_evaluator import SentimentAnalyst  # type: ignore
+    from utils.file_reader import get_salesman_context  # type: ignore
 
 app = typer.Typer()
 
@@ -387,10 +389,12 @@ def complete_pipeline(
     conversation_history = [
         {"role": "cliente", "content": text}
     ]
+    salesman_profile = get_salesman_context()
     options = generator.generate_response(
         sentiment_analysis=sentiment_result,
         client_context=client_data,
         product_context=product_data,
+        salesman_context=salesman_profile,
         stage=stage,
         conversation_context={"conversation_history": conversation_history},
     )
@@ -403,7 +407,18 @@ def complete_pipeline(
     typer.echo("\n🔄 Paso 3: Evaluando mejor opción...\n")
     
     evaluator = Evaluator(openai_api_key=api_key)
-    eval_result = evaluator.evaluate(conversation_history=conversation_history, options=options)
+    full_context = {
+        "conversation_history": conversation_history,
+        "client_profile": client_data,
+        "product_info": product_data,
+        "salesman_profile": salesman_profile,
+        "stage": stage,
+    }
+    eval_result = evaluator.evaluate(
+        conversation_history=conversation_history,
+        options=options,
+        full_context=full_context,
+    )
 
     typer.echo(f"✅ Mejor opción: {eval_result['mosfet']}")
     typer.echo(f"📝 Texto: {eval_result['response'][:80]}...")

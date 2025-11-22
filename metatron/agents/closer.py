@@ -192,6 +192,7 @@ class Closer:
             sentiment_analysis=sentiment_analysis,
             client_context=self.context.client_profile,
             product_context=self.context.product_info,
+            salesman_context=self.context.meta.get("salesman_profile"),
             stage=self.context.stage,
             conversation_context=self.context,
         )

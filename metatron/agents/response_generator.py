@@ -4,6 +4,7 @@ Genera opciones usando herramientas especializadas según el contexto del client
 """
 
 import json
+from typing import Optional
 from openai import OpenAI
 from metatron.utils.logger import logger
 from metatron.utils.file_reader import get_close_context
@@ -30,6 +31,7 @@ class ResponseGenerator:
         )
         self.model = model
         self.temperature = temperature
+        self._last_tool_used: Optional[str] = None
 
     def generate_response(
         self,
@@ -37,6 +39,7 @@ class ResponseGenerator:
         client_context: dict,
         product_context: dict,
         stage: str,
+        salesman_context=None,
         conversation_context=None,
     ) -> list:
         """
@@ -49,6 +52,7 @@ class ResponseGenerator:
             sentiment_analysis=sentiment_analysis,
             client_context=client_context,
             product_context=product_context,
+            salesman_context=salesman_context,
             stage=stage,
             conversation_history=conversation_history,
         )
@@ -56,12 +60,14 @@ class ResponseGenerator:
 
         # Llama a la herramienta correspondiente
         options = getattr(self, tool_to_use)(
-            sentiment_analysis,
-            client_context,
-            product_context,
-            stage,
+            sentiment_analysis=sentiment_analysis,
+            client_context=client_context,
+            product_context=product_context,
+            stage=stage,
             conversation_history=conversation_history,
+            salesman_context=salesman_context,
         )
+        self._last_tool_used = tool_to_use
 
         logger.info("   → Opciones generadas por la herramienta:")
         for o in options:
@@ -77,7 +83,8 @@ class ResponseGenerator:
         sentiment_analysis,
         client_context,
         product_context,
-        stage,
+        salesman_context=None,
+        stage="intro",
         conversation_history=None,
     ) -> str:
         """
@@ -117,8 +124,14 @@ class ResponseGenerator:
             for f in sentiment_analysis.get("sentiments", [])
         ])
 
+        salesman_profile = self._format_salesman_profile(salesman_context)
+
         system_message = """
-Eres un asistente experto en ventas por teléfono.
+Eres un asistente experto en ventas por teléfono. Tienes que tomar el contexto de la conversacion y definir que herramienta es la más
+adecuada para llevar al cliente a una venta. Sí el cliente muestra interes en comprar selecciona close_sale. En caso de que el cliente
+muestre dudas sobre adquirir el producto o declare que no esta seguro si el producto es para si intenta seduce_lead, si el usuario 
+demuestra que le interesa pero quiere posponer la venta usa add_scarcity en caso de que el cliente pide más detalles usa add_details.
+
 
 Tu tarea es elegir la herramienta correcta basándote solo en:
 - contexto del cliente
@@ -153,6 +166,9 @@ Etapa actual: {stage}
 ### CONTEXTO DEL PRODUCTO ###
 {product_context}
 
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 ### SENTIMIENTO ###
 {fragments_text}
 
@@ -162,9 +178,6 @@ Etapa actual: {stage}
 Selecciona la herramienta correcta según este contexto:
 """
 
-        # ---------------------------------------------------------
-        # 3. Llamada al modelo Groq
-        # ---------------------------------------------------------
         system_message = f"{SALES_GUIDELINES}\n\n{system_message}"
 
         response = self.client.chat.completions.create(
@@ -179,9 +192,6 @@ Selecciona la herramienta correcta según este contexto:
         tool_name = response.choices[0].message.content.strip()
         logger.info(f"   → Groq sugiere: {tool_name}")
 
-        # ---------------------------------------------------------
-        # 4. Validación de herramienta
-        # ---------------------------------------------------------
         valid_tools = {
             "greet_user",
             "seduce_lead",
@@ -201,16 +211,23 @@ Selecciona la herramienta correcta según este contexto:
         return tool_name
 
 
-    # ------------------------------------------------------
-    # NUEVA HERRAMIENTA: seduce_lead
-    # ------------------------------------------------------
-    def seduce_lead(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def seduce_lead(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Conecta el producto con el perfil del cliente mostrando beneficios,
         ventajas claras y por qué es ideal para él.
         Debe ser persuasivo pero conversacional.
         """
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
 
         system_msg = f"""
 Eres un vendedor persuasivo. Tu objetivo es "seducir" comercialmente al cliente,
@@ -239,6 +256,9 @@ Mantén coherencia con el historial reciente de la conversación.
 ### CONTEXTO DEL CLIENTE ###
 {client_context}
 
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 ### CONTEXTO DE CONVERSACIÓN ###
 {history_snippet}
 
@@ -256,11 +276,83 @@ Genera las 3 opciones:"""
     # ---------------------------
     # Herramientas / técnicas de venta
     # ---------------------------
-    def fix_doubts(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def seduce_lead(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
+        """
+        Conecta el producto con el perfil del cliente mostrando beneficios,
+        ventajas claras y por qué es ideal para él.
+        Debe ser persuasivo pero conversacional.
+        """
+        history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
+
+        system_msg = f"""
+Eres un vendedor persuasivo. Tu objetivo es "seducir" comercialmente al cliente,
+explicando por qué este producto es perfecto para él.
+
+### DEFINICIÓN DE SEDUCIR AQUÍ ###
+- No es sexual.
+- Es resaltar beneficios.
+- Conectar el producto con el cliente.
+- Mostrar por qué le conviene.
+- Ser cálido, claro y convincente.
+
+### INSTRUCCIONES ###
+Genera exactamente 3 opciones en JSON:
+- directa: vende el beneficio principal directo
+- consultiva: explora su necesidad y cómo encaja
+- empatica: resalta comprensión del cliente + beneficio clave
+
+NO repitas beneficios si ya se dijeron previamente.
+NO inventes beneficios que no están en el contexto.
+Mantén coherencia con el historial reciente de la conversación.
+
+### CONTEXTO DEL PRODUCTO ###
+{product_context}
+
+### CONTEXTO DEL CLIENTE ###
+{client_context}
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
+### CONTEXTO DE CONVERSACIÓN ###
+{history_snippet}
+
+Devuelve solo JSON.
+"""
+
+        fragments = [f['text'] for f in sentiment_analysis.get("sentiments", [])]
+        user_msg = f"""### Fragmentos previos ###
+{fragments}
+
+Genera las 3 opciones:"""
+
+        return self._call_openai(system_msg, user_msg)
+
+    def fix_doubts(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Aborda dudas o preocupaciones del cliente usando técnica consultiva.
         """
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
         system_msg = f"""Eres un asistente experto en ventas. El cliente tiene dudas o preocupaciones y ya llevas una conversación previa con él.
 
 ### INSTRUCCIONES ###
@@ -274,6 +366,9 @@ Mantén coherencia con las respuestas anteriores y evita repetir ideas textualme
 ### CONTEXTO DEL CLIENTE ###
 {client_context}
 
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 ### CONTEXTO DE CONVERSACIÓN ###
 {history_snippet}
 """
@@ -284,12 +379,22 @@ Mantén coherencia con las respuestas anteriores y evita repetir ideas textualme
 Genera las 3 opciones:"""
         return self._call_openai(system_msg, user_msg)
 
-    def greet_user(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def greet_user(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Saluda al cliente usando su nombre y un mensaje amigable.
         """
         client_name = client_context.get("name", "Cliente")
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
         system_msg = f"""Genera 3 opciones de saludo en formato JSON teniendo en cuenta lo que ya se dijo.
 
 ### FORMATO REQUERIDO ###
@@ -303,6 +408,10 @@ Genera las 3 opciones:"""
 - directa: saludo profesional y breve
 - consultiva: saludo interactivo preguntando cómo se encuentra
 - empatica: saludo cálido y cercano
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 Devuelve JSON EXACTO. No agregues texto adicional fuera del JSON.
 Mantén coherencia con este historial reciente:
 {history_snippet}
@@ -313,7 +422,16 @@ Mantén coherencia con este historial reciente:
 Genera los saludos:"""
         return self._call_openai(system_msg, user_msg)
 
-    def close_sale(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def close_sale(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Genera 3 opciones de cierre basadas en los próximos pasos definidos en close_context,
         manteniendo un tono conversacional y persuasivo.
@@ -321,6 +439,7 @@ Genera los saludos:"""
         close_context = get_close_context()  # Debe devolver los pasos próximos que queremos sugerir
         fragments = [f['text'] for f in sentiment_analysis.get('sentiments', [])]
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
 
         system_msg = f"""El cliente está interesado y en etapa de cierre. Necesitas continuar la conversación sin perder el hilo.
 
@@ -329,6 +448,9 @@ Genera los saludos:"""
 
 ### INFORMACIÓN DEL PRODUCTO ###
 {product_context}
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
 
 ### INSTRUCCIONES ###
 1. Mantén un estilo conversacional y cercano.
@@ -351,11 +473,21 @@ Genera los saludos:"""
 Genera las 3 opciones de cierre:"""
         return self._call_openai(system_msg, user_msg)
 
-    def add_details(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def add_details(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Añade detalles adicionales del producto para convencer al cliente.
         """
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
         system_msg = f"""El cliente solicita más detalles sobre el producto. Responde dando continuidad a la conversación.
 
 ### INFORMACIÓN DEL PRODUCTO ###
@@ -364,6 +496,10 @@ Genera las 3 opciones de cierre:"""
 ### INSTRUCCIONES ###
 Genera 3 opciones persuasivas.
 Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 Usa este historial reciente para mantener coherencia:
 {history_snippet}
 """
@@ -371,11 +507,21 @@ Usa este historial reciente para mantener coherencia:
         user_msg = "Genera las opciones con detalles del producto:"
         return self._call_openai(system_msg, user_msg)
 
-    def add_scarcity(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def add_scarcity(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Genera sentido de urgencia / escasez para impulsar el cierre.
         """
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
         system_msg = f"""El cliente está en etapa de cierre. Usa técnicas de escasez y urgencia sin romper el hilo de la conversación.
 
 ### INFORMACIÓN DEL PRODUCTO ###
@@ -384,6 +530,10 @@ Usa este historial reciente para mantener coherencia:
 ### INSTRUCCIONES ###
 Genera 3 opciones persuasivas con urgencia/escasez.
 Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 Historial reciente:
 {history_snippet}
 """
@@ -392,11 +542,21 @@ Historial reciente:
         return self._call_openai(system_msg, user_msg)
 
 
-    def search_offers(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def search_offers(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Muestra ofertas disponibles para convencer al cliente.
         """
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
         system_msg = f"""El cliente menciona descuentos o promociones y espera continuidad en la conversación.
 
 ### INFORMACIÓN DEL PRODUCTO ###
@@ -405,6 +565,10 @@ Historial reciente:
 ### INSTRUCCIONES ###
 Genera 3 opciones persuasivas basadas en ofertas.
 Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 Historial reciente:
 {history_snippet}
 """
@@ -412,17 +576,31 @@ Historial reciente:
         user_msg = "Genera las opciones con ofertas disponibles:"
         return self._call_openai(system_msg, user_msg)
 
-    def default_tool(self, sentiment_analysis, client_context, product_context, stage, conversation_history=None):
+    def default_tool(
+        self,
+        sentiment_analysis,
+        client_context,
+        product_context,
+        stage,
+        *,
+        conversation_history=None,
+        salesman_context=None,
+    ):
         """
         Genera respuestas por defecto si no se detecta ninguna necesidad específica.
         """
         history_snippet = self._format_recent_messages(conversation_history)
+        salesman_profile = self._format_salesman_profile(salesman_context)
         system_msg = f"""### INFORMACIÓN DEL PRODUCTO ###
 {product_context}
 
 ### INSTRUCCIONES ###
 Genera 3 opciones de respuesta persuasivas.
 Devuelve JSON exacto con 3 opciones: directa, consultiva y empatica.
+
+### PERFIL DEL VENDEDOR ###
+{salesman_profile}
+
 Usa el historial reciente para mantener coherencia:
 {history_snippet}
 """
@@ -520,6 +698,19 @@ Genera las opciones:"""
             content = msg.get("content", "")
             formatted.append(f"{role}: {content}")
         return "\n".join(formatted)
+
+    def _format_salesman_profile(self, salesman_context):
+        """
+        Normaliza el contexto del vendedor para usarlo en prompts.
+        """
+        if not salesman_context:
+            return "No hay información adicional del vendedor."
+        if isinstance(salesman_context, (dict, list)):
+            try:
+                return json.dumps(salesman_context, ensure_ascii=False, indent=2)
+            except Exception:
+                return str(salesman_context)
+        return str(salesman_context)
 
     def _normalize_options(self, options):
         """
