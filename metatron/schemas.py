@@ -4,7 +4,7 @@ Pydantic schemas for API requests and responses.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
