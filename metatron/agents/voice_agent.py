@@ -12,18 +12,18 @@ from livekit.agents import (
     WorkerOptions,
     cli,
     llm,
+    voice,
 )
-from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import openai, silero
 
 try:
     from ..agents.closer import Closer
-    from ..agents.minimax_tts import MiniMaxTTS
+    from ..agents.elevenlabs_tts import ElevenLabsTTS
     from ..config import settings
     from ..utils.logger import logger
 except ImportError:
     from agents.closer import Closer
-    from agents.minimax_tts import MiniMaxTTS
+    from agents.elevenlabs_tts import ElevenLabsTTS
     from config import settings
     from utils.logger import logger
 
@@ -54,24 +54,43 @@ class MetatronVoiceAgent:
         
         # Wait for participant
         participant = await ctx.wait_for_participant()
-        logger.info(f"Participant joined: {participant.identity}")
+        
+        # Detect if this is an outbound call
+        is_outbound = (
+            "phone-" in participant.identity or 
+            "call-" in ctx.room.name or
+            participant.identity.startswith("+")
+        )
+        
+        logger.info(f"Participant joined: {participant.identity} (outbound call: {is_outbound})")
         
         # Validate required settings
         if not settings.openai_api_key:
             logger.error("OpenAI API key not configured")
             raise ValueError("OPENAI_API_KEY is required for voice agent")
         
-        if not settings.minimax_api_key or not settings.minimax_group_id:
-            logger.error("MiniMax credentials not configured")
-            raise ValueError("MINIMAX_API_KEY and MINIMAX_GROUP_ID are required for voice agent")
+        if not settings.elevenlabs_api_key:
+            logger.error("ElevenLabs API key not configured")
+            raise ValueError("ELEVENLABS_API_KEY is required for voice agent")
         
-        # Initialize TTS with MiniMax
-        logger.info("Initializing MiniMax TTS...")
-        minimax_tts = MiniMaxTTS(
-            api_key=settings.minimax_api_key,
-            group_id=settings.minimax_group_id,
-            model=settings.minimax_tts_model,
-            voice_id=settings.minimax_voice_id,
+        # Get voice_id from room metadata or use default
+        import json
+        voice_id = settings.elevenlabs_default_voice_id
+        try:
+            if ctx.room.metadata:
+                metadata = json.loads(ctx.room.metadata)
+                if "voice_id" in metadata:
+                    voice_id = metadata["voice_id"]
+                    logger.info(f"Using custom voice_id from room metadata: {voice_id}")
+        except Exception as e:
+            logger.warning(f"Could not parse room metadata, using default voice_id: {e}")
+        
+        # Initialize TTS with ElevenLabs
+        logger.info(f"Initializing ElevenLabs TTS with voice_id: {voice_id}...")
+        elevenlabs_tts = ElevenLabsTTS(
+            api_key=settings.elevenlabs_api_key,
+            model=settings.elevenlabs_model,
+            voice_id=voice_id,
         )
         
         # Initialize STT with OpenAI Whisper
@@ -85,21 +104,27 @@ class MetatronVoiceAgent:
         logger.info("Loading Silero VAD...")
         vad = silero.VAD.load()
         
-        # Create voice pipeline
-        logger.info("Creating voice pipeline...")
-        assistant = VoicePipelineAgent(
+        # Create voice agent
+        logger.info("Creating voice agent...")
+        assistant = voice.Agent(
             vad=vad,
             stt=stt,
             llm=self._create_llm_adapter(),
-            tts=minimax_tts,
+            tts=elevenlabs_tts,
         )
         
-        # Start the pipeline
+        # Start the agent
         logger.info("Starting voice assistant...")
-        assistant.start(ctx.room, participant)
+        await assistant.start(ctx.room, participant)
         
-        # Send greeting
-        greeting = "Hola, soy tu asesor de ventas. ¿En qué puedo ayudarte hoy?"
+        # Send greeting based on call type
+        if is_outbound:
+            greeting = "Hola, le llamo de parte de nuestra empresa. ¿Tiene un momento para hablar sobre nuestros servicios?"
+            logger.info("Using outbound call greeting")
+        else:
+            greeting = "Hola, gracias por llamar. Soy tu asesor de ventas. ¿En qué puedo ayudarte hoy?"
+            logger.info("Using inbound call greeting")
+        
         await assistant.say(greeting, allow_interruptions=True)
         
         logger.info("Voice pipeline started successfully")
@@ -171,7 +196,7 @@ def run_voice_worker():
     logger.info("Starting Metatron Voice Worker...")
     logger.info(f"LiveKit URL: {settings.livekit_url}")
     logger.info(f"OpenAI API: {'configured' if settings.openai_api_key else 'NOT CONFIGURED'}")
-    logger.info(f"MiniMax API: {'configured' if settings.minimax_api_key else 'NOT CONFIGURED'}")
+    logger.info(f"ElevenLabs API: {'configured' if settings.elevenlabs_api_key else 'NOT CONFIGURED'}")
     
     agent = MetatronVoiceAgent()
     

@@ -8,9 +8,9 @@ It uses a lightweight OpenAI model (gpt-4o-mini or equivalent).
 
 import logging
 from openai import OpenAI
-from utils.logger import logger
-from utils.file_reader import get_salesman_context
-from config import settings
+from metatron.utils.logger import logger
+from metatron.utils.file_reader import get_salesman_context
+from metatron.config import settings
 
 
 PERSONALITY_PROFILE = get_salesman_context()

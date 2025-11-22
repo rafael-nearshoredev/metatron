@@ -7,9 +7,9 @@ La salida respeta exactamente el texto original de la opción seleccionada.
 import logging
 import json
 from openai import OpenAI
-from utils.logger import logger
-from utils.file_reader import get_lead_context, get_product_context
-from config import settings
+from metatron.utils.logger import logger
+from metatron.utils.file_reader import get_lead_context, get_product_context
+from metatron.config import settings
 
 # Groq configuration
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"

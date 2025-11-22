@@ -49,6 +49,7 @@ class CreateRoomRequest(BaseModel):
     room_name: Optional[str] = Field(default=None, description="Name of the room (auto-generated if not provided)")
     participant_name: str = Field(default="Guest", description="Name of the participant")
     metadata: Optional[dict] = Field(default=None, description="Optional metadata for the room")
+    voice_id: Optional[str] = Field(default=None, description="ElevenLabs voice ID for voice cloning")
 
 
 class RoomResponse(BaseModel):
@@ -68,6 +69,22 @@ class RoomInfo(BaseModel):
 class ListRoomsResponse(BaseModel):
     """Response schema for listing rooms."""
     rooms: list[RoomInfo] = Field(..., description="List of active rooms")
+
+
+# Outbound call schemas
+class MakeCallRequest(BaseModel):
+    """Request schema for making an outbound call."""
+    phone_number: str = Field(..., description="Phone number to call in E.164 format (e.g., +1234567890)")
+    room_name: Optional[str] = Field(default=None, description="Optional room name (auto-generated if not provided)")
+    metadata: Optional[dict] = Field(default=None, description="Optional metadata for the call")
+
+
+class MakeCallResponse(BaseModel):
+    """Response schema for outbound call initiation."""
+    call_id: str = Field(..., description="Unique identifier for the call (participant ID)")
+    room_name: str = Field(..., description="LiveKit room name where the call is happening")
+    phone_number: str = Field(..., description="Phone number being called")
+    status: str = Field(..., description="Call status (e.g., 'initiated', 'ringing')")
 
 
 class InsertAgentRequest(BaseModel):

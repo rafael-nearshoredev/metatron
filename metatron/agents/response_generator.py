@@ -5,8 +5,8 @@ Genera opciones usando herramientas especializadas según el contexto del client
 
 import json
 from openai import OpenAI
-from utils.logger import logger
-from utils.file_reader import get_close_context
+from metatron.utils.logger import logger
+from metatron.utils.file_reader import get_close_context
 
 # Groq configuration
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"

@@ -54,6 +54,7 @@ export interface TokenRequest {
   room_name: string
   participant_name: string
   metadata?: Record<string, any>
+  voice_id?: string
 }
 
 export interface TokenResponse {
@@ -222,11 +223,12 @@ export const roomApi = {
   /**
    * Get access token for LiveKit
    */
-  async getAccessToken(roomName: string, participantName: string, metadata?: Record<string, any>): Promise<TokenResponse> {
+  async getAccessToken(roomName: string, participantName: string, metadata?: Record<string, any>, voiceId?: string): Promise<TokenResponse> {
     return apiClient.post<TokenResponse>('/rooms/create', {
       room_name: roomName,
       participant_name: participantName,
       ...(metadata && { metadata }),
+      ...(voiceId && { voice_id: voiceId }),
     })
   },
 }

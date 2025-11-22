@@ -581,8 +581,8 @@ def start_voice_worker():
         from metatron.agents.voice_agent import run_voice_worker
         from metatron.config import settings
     except ImportError:
-        from agents.voice_agent import run_voice_worker  # type: ignore
-        from config import settings  # type: ignore
+        from metatron.agents.voice_agent import run_voice_worker  # type: ignore
+        from metatron.config import settings  # type: ignore
     
     typer.echo("=" * 80)
     typer.echo("🎙️  METATRON VOICE WORKER")
@@ -604,9 +604,9 @@ def start_voice_worker():
         typer.echo("OpenAI is required for Whisper STT. Please set OPENAI_API_KEY in your .env file", err=True)
         raise typer.Exit(code=1)
     
-    if not settings.minimax_api_key or not settings.minimax_group_id:
-        typer.echo("\n❌ Error: MiniMax credentials not configured", err=True)
-        typer.echo("Please set MINIMAX_API_KEY and MINIMAX_GROUP_ID in your .env file", err=True)
+    if not settings.elevenlabs_api_key:
+        typer.echo("\n❌ Error: ElevenLabs API key not configured", err=True)
+        typer.echo("Please set ELEVENLABS_API_KEY in your .env file", err=True)
         raise typer.Exit(code=1)
     
     typer.echo(f"\n✓ LiveKit URL: {settings.livekit_url}")

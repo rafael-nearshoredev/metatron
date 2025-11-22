@@ -5,7 +5,7 @@ Segmenta el texto del cliente, analiza sentimiento y genera insights de personal
 
 import json
 from openai import OpenAI
-from utils.logger import logger
+from metatron.utils.logger import logger
 from transformers import pipeline
 
 SPANISH_SENTIMENT_MODEL = "pysentimiento/robertuito-sentiment-analysis"

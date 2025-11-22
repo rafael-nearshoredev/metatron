@@ -8,13 +8,13 @@ import json
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
-from utils.logger import logger
-from utils.file_reader import get_salesman_context, get_lead_context, get_product_context
-from config import settings
-from agents.sentiment_evaluator import SentimentAnalyst
-from agents.response_generator import ResponseGenerator
-from agents.evaluator import Evaluator
-from agents.personality_adapter import PersonalityAdapter
+from metatron.utils.logger import logger
+from metatron.utils.file_reader import get_salesman_context, get_lead_context, get_product_context
+from metatron.config import settings
+from metatron.agents.sentiment_evaluator import SentimentAnalyst
+from metatron.agents.response_generator import ResponseGenerator
+from metatron.agents.evaluator import Evaluator
+from metatron.agents.personality_adapter import PersonalityAdapter
 
 
 @dataclass

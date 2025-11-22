@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     livekit_url: Optional[str] = Field(default=None, alias="LIVEKIT_URL")
     livekit_api_key: Optional[str] = Field(default=None, alias="LIVEKIT_API_KEY")
     livekit_api_secret: Optional[str] = Field(default=None, alias="LIVEKIT_API_SECRET")
+    livekit_sip_trunk_id: Optional[str] = Field(default=None, alias="LIVEKIT_SIP_TRUNK_ID")
     
     # OpenAI settings (for Whisper STT)
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
@@ -29,11 +30,10 @@ class Settings(BaseSettings):
     groq_base_url: str = Field(default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL")
     groq_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL")
     
-    # MiniMax TTS settings
-    minimax_api_key: Optional[str] = Field(default=None, alias="MINIMAX_API_KEY")
-    minimax_group_id: Optional[str] = Field(default=None, alias="MINIMAX_GROUP_ID")
-    minimax_tts_model: str = Field(default="speech-01-turbo", alias="MINIMAX_TTS_MODEL")
-    minimax_voice_id: str = Field(default="male-qn-qingse", alias="MINIMAX_VOICE_ID")
+    # ElevenLabs TTS settings
+    elevenlabs_api_key: Optional[str] = Field(default=None, alias="ELEVENLABS_API_KEY")
+    elevenlabs_model: str = Field(default="eleven_turbo_v2_5", alias="ELEVENLABS_MODEL")
+    elevenlabs_default_voice_id: str = Field(default="21m00Tcm4TlvDq8ikWAM", alias="ELEVENLABS_DEFAULT_VOICE_ID")
     
     # Server settings
     host: str = Field(default="0.0.0.0", alias="HOST")
@@ -86,7 +86,8 @@ def load_settings() -> Settings:
     print(Fore.YELLOW + f"LiveKit Project ID: {'***' if settings.livekit_project_id else 'Not set'}")
     print(Fore.YELLOW + f"LiveKit URL: {settings.livekit_url if settings.livekit_url else 'Not set'}")
     print(Fore.YELLOW + f"LiveKit API Key: {'***' if settings.livekit_api_key else 'Not set'}")
-    print(Fore.YELLOW + f"MiniMax API Key: {'***' if settings.minimax_api_key else 'Not set'}\n")
+    print(Fore.YELLOW + f"LiveKit SIP Trunk: {'***' if settings.livekit_sip_trunk_id else 'Not set'}")
+    print(Fore.YELLOW + f"ElevenLabs API Key: {'***' if settings.elevenlabs_api_key else 'Not set'}\n")
 
     return settings
 

@@ -24,6 +24,8 @@ from ..schemas import (
     ListRoomsResponse,
     InsertAgentRequest,
     InsertAgentResponse,
+    MakeCallRequest,
+    MakeCallResponse,
 )
 # from ..services import ContextService  # TODO: Implement services
 from ..utils.file_reader import (
@@ -62,7 +64,7 @@ async def ping() -> JSONResponse:
             "environment": settings.environment,
             "livekit_configured": bool(settings.livekit_url and settings.livekit_api_key),
             "openai_configured": bool(settings.openai_api_key),
-            "minimax_configured": bool(settings.minimax_api_key),
+            "elevenlabs_configured": bool(settings.elevenlabs_api_key),
         },
     )
 
@@ -207,6 +209,16 @@ async def create_room(request: CreateRoomRequest) -> RoomResponse:
         
         logger.info(f"Creating LiveKit room: {room_name} for participant: {request.participant_name}")
         
+        # Prepare room metadata with voice_id if provided
+        room_metadata = {}
+        if request.voice_id:
+            room_metadata["voice_id"] = request.voice_id
+            logger.info(f"Room will use custom voice_id: {request.voice_id}")
+        
+        # Merge with any additional metadata from request
+        if request.metadata:
+            room_metadata.update(request.metadata)
+        
         # Create LiveKit API client
         lk_api = livekit_api.LiveKitAPI(
             settings.livekit_url,
@@ -215,12 +227,14 @@ async def create_room(request: CreateRoomRequest) -> RoomResponse:
         )
         
         try:
-            # Create or get room
+            # Create or get room with metadata
+            import json
             room_info = await lk_api.room.create_room(
                 livekit_api.CreateRoomRequest(
                     name=room_name,
                     empty_timeout=300,  # 5 minutes
                     max_participants=2,  # 1 customer + 1 agent
+                    metadata=json.dumps(room_metadata) if room_metadata else "",
                 )
             )
             
@@ -493,3 +507,120 @@ async def delete_room(room_name: str):
     except Exception as e:
         logger.error(f"Error deleting room: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to delete room: {str(e)}")
+
+
+@router.post(
+    "/calls/outbound",
+    response_model=MakeCallResponse,
+    summary="Make outbound call",
+    description="Initiate an outbound phone call to a number using SIP trunk",
+    tags=["LiveKit"],
+    responses={
+        200: {"description": "Call initiated successfully"},
+        400: {"description": "Invalid phone number or request"},
+        500: {"description": "Internal Server Error"},
+        503: {"description": "LiveKit or SIP trunk not configured"},
+    },
+)
+async def make_outbound_call(request: MakeCallRequest) -> MakeCallResponse:
+    """
+    Initiate an outbound phone call.
+    
+    The voice agent will automatically join the call when the recipient answers.
+    
+    Args:
+        request: MakeCallRequest with phone_number and optional metadata
+    
+    Returns:
+        MakeCallResponse with call details
+    
+    Example:
+        POST /calls/outbound
+        {
+            "phone_number": "+1234567890",
+            "metadata": {"campaign": "sales_q4"}
+        }
+    """
+    if not LIVEKIT_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit SDK not installed. Install with: pip install livekit livekit-api"
+        )
+    
+    if not settings.livekit_url or not settings.livekit_api_key or not settings.livekit_api_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit not configured. Please set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET"
+        )
+    
+    if not settings.livekit_sip_trunk_id:
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit SIP trunk not configured. Set LIVEKIT_SIP_TRUNK_ID in .env file"
+        )
+    
+    # Validate phone number format (basic E.164 check)
+    phone = request.phone_number.strip()
+    if not phone.startswith('+') or not phone[1:].isdigit() or len(phone) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid phone number. Must be in E.164 format (e.g., +1234567890)"
+        )
+    
+    try:
+        # Generate unique room name if not provided
+        room_name = request.room_name or f"call-{secrets.token_hex(6)}"
+        
+        logger.info(f"Initiating outbound call to {phone} in room {room_name}")
+        
+        # Create LiveKit API client
+        lk_api = livekit_api.LiveKitAPI(
+            settings.livekit_url,
+            settings.livekit_api_key,
+            settings.livekit_api_secret,
+        )
+        
+        # Create room first
+        await lk_api.room.create_room(
+            livekit_api.CreateRoomRequest(
+                name=room_name,
+                empty_timeout=600,  # 10 minutes
+                max_participants=2,  # Phone participant + Agent
+            )
+        )
+        
+        logger.info(f"Created room: {room_name}")
+        
+        # Prepare metadata
+        import json
+        metadata_str = json.dumps(request.metadata or {})
+        
+        # Create SIP participant (initiates the call)
+        sip_request = livekit_api.CreateSIPParticipantRequest(
+            sip_trunk_id=settings.livekit_sip_trunk_id,
+            sip_call_to=phone,
+            room_name=room_name,
+            participant_identity=f"phone-{phone.replace('+', '')}",
+            participant_name=f"Call to {phone}",
+            participant_metadata=metadata_str,
+            dtmf="",  # No DTMF to send initially
+            play_ringtone=True,  # Play ringtone while connecting
+            hide_phone_number=False,  # Show caller ID
+        )
+        
+        sip_participant = await lk_api.sip.create_sip_participant(sip_request)
+        
+        logger.info(f"✅ Outbound call initiated: {sip_participant.participant_id} to {phone}")
+        
+        return MakeCallResponse(
+            call_id=sip_participant.participant_id,
+            room_name=room_name,
+            phone_number=phone,
+            status="initiated"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error making outbound call: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to initiate call: {str(e)}")
