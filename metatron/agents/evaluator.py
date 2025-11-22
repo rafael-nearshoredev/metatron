@@ -24,7 +24,7 @@ class Evaluator:
     - Seleccionar la mejor opción sin alterar el texto original
     """
 
-    def __init__(self, openai_api_key: str, model=DEFAULT_MODEL, temperature=0.7):
+    def __init__(self, openai_api_key: str, model=DEFAULT_MODEL, temperature=0.5):
         self.client = OpenAI(
             base_url=GROQ_BASE_URL,
             api_key=openai_api_key
@@ -36,6 +36,8 @@ class Evaluator:
         self,
         conversation_history: list,
         options: list,
+        *,
+        full_context: dict | None = None,
     ) -> dict:
         """
         conversation_history: lista de dicts {"role": "cliente"|"agente", "content": "..."}
@@ -49,8 +51,9 @@ class Evaluator:
         product_info = get_product_context()
 
         history_text = "\n".join(
-            [f"{m['role'].capitalize()}: {m['content']}" for m in conversation_history]
+            [f"{m.get('role', '').capitalize()}: {m.get('content', '')}" for m in conversation_history]
         )
+        context_snapshot = self._format_context(full_context)
 
         options_text = "\n".join(
             [f"{o['id']} ({o['intent']}): {o['text']}" for o in options]
@@ -69,7 +72,11 @@ class Evaluator:
 Tu tarea es analizar la conversación y las opciones de respuesta disponibles.
 Indica cuál es la mejor opción para avanzar hacia el cierre.
 Solo devuelve el ID de la opción que consideres óptima en formato JSON: {{"best_option_id": "<ID>"}}.
-No modifiques el texto de la opción."""
+No modifiques el texto de la opción.
+
+### CONTEXTO COMPLETO ###
+{context_snapshot}
+"""
 
         # DYNAMIC content (changes per request)
         user_message = f"""### CONVERSACIÓN ###
@@ -119,3 +126,11 @@ Selecciona la mejor opción:"""
             "mosfet": best_option_id,
             "response": best_option["text"] if best_option else ""
         }
+
+    def _format_context(self, full_context: dict | None) -> str:
+        if not full_context:
+            return "No hay más contexto disponible."
+        try:
+            return json.dumps(full_context, indent=2, ensure_ascii=False)
+        except Exception:
+            return str(full_context)

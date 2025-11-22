@@ -1,1 +1,5 @@
-El nombre del lead es Rafael es ingeniero y le interesa el emprendimiento
+El nombre del lead es Rafael es ingeniero y le interesa el emprendimiento.
+ 
+Cuenta con un fuerte dominio en Clojure, Python y arquitecturas basadas en Kubernetes, Terraform y servicios cloud como AWS, incluyendo el uso de Lambdas y herramientas serverless. Combina habilidades técnicas profundas con una mentalidad emprendedora: disfruta identificar problemas reales, proponer soluciones innovadoras y trabajar con equipos multidisciplinarios para llevar ideas al mercado.
+
+Su experiencia en startups le ha dado la capacidad de adaptarse rápidamente, aprender sobre la marcha y aportar valor tanto en la construcción de infraestructura robusta como en el diseño de sistemas eficientes. Además, mantiene un interés constante por el ecosistema de innovación y la creación de nuevos proyectos tecnológicos.
