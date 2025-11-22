@@ -10,6 +10,7 @@ _CONTEXT_FILES = {
     "salesman": _FILES_DIR / "salesman_context.txt",
     "lead": _FILES_DIR / "lead_context.txt",
     "product": _FILES_DIR / "product_context.txt",
+    "close": _FILES_DIR / "close_context.txt",
 }
 
 
@@ -56,6 +57,11 @@ def get_product_context() -> str:
     return read_context("product")
 
 
+def get_close_context() -> str:
+    """Return the close context text."""
+    return read_context("close")
+
+
 def set_salesman_context(content: str) -> None:
     """Overwrite the salesman context file."""
     write_context("salesman", content)
@@ -68,4 +74,9 @@ def set_lead_context(content: str) -> None:
 
 def set_product_context(content: str) -> None:
     """Overwrite the product context file."""
+
+
+def set_close_context(content: str) -> None:
+    """Overwrite the close context file."""
+    write_context("close", content)
     write_context("product", content)
