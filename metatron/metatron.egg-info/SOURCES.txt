@@ -5,6 +5,7 @@ agents/closer.py
 agents/evaluator.py
 agents/personality_adapter.py
 agents/response_generator.py
+agents/sentiment_evaluator.py
 cli/__init__.py
 cli/__main__.py
 cli/main.py

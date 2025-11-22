@@ -1,0 +1,35 @@
+# Use Python 3.13 slim image as base
+FROM python:3.13-slim-bookworm AS base
+
+# Install system dependencies
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && apt-get -y upgrade \
+    && apt-get -y install curl libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# App lives at /app/metatron
+WORKDIR /app/metatron
+COPY . .
+
+# Install dependencies + local package
+RUN uv sync --frozen --no-cache
+
+# Create files directory
+RUN mkdir -p /app/metatron/files
+
+# Expose port
+EXPOSE 8000
+
+# Environment
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/app/metatron/.venv/bin:$PATH" \
+    PYTHONPATH="/app/metatron:$PYTHONPATH"
+
+# Run FastAPI app
+CMD ["uv", "run", "python", "-m", "uvicorn", "metatron.main:app", "--host", "0.0.0.0", "--port", "8000"]
