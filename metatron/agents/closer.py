@@ -12,6 +12,7 @@ from metatron.utils.file_reader import get_salesman_context, get_lead_context, g
 from metatron.config import settings
 from metatron.agents.sentiment_evaluator import SentimentAnalyst
 from metatron.agents.response_generator import ResponseGenerator
+from metatron.agents.simple_pipeline import SimplePipeline
 from metatron.agents.evaluator import Evaluator
 from metatron.agents.personality_adapter import PersonalityAdapter
 
@@ -108,12 +109,14 @@ class Closer:
             )
 
         self.use_sentiment = enable_sentiment
+        self.use_simple_pipeline = settings.use_simple_pipeline
         self.sentiment_analyst = None
         if self.use_sentiment:
             self.sentiment_analyst = SentimentAnalyst(openai_api_key=settings.groq_api_key)
         self.response_generator = ResponseGenerator(openai_api_key=settings.groq_api_key)
         self.evaluator = Evaluator(openai_api_key=settings.groq_api_key)
         self.personality_adapter = PersonalityAdapter(openai_api_key=settings.groq_api_key)
+        self.simple_pipeline = SimplePipeline(openai_api_key=settings.groq_api_key) if self.use_simple_pipeline else None
 
         self.context = GlobalConversationContext()
 
@@ -179,6 +182,9 @@ class Closer:
         if new_stage != self.context.stage:
             logger.info(f"🏆 Transición de etapa detectada → {new_stage}")
             self.context.update_stage(new_stage) 
+
+        if self.use_simple_pipeline and self.simple_pipeline:
+            return self._process_with_simple_pipeline(incoming_text, sentiment_analysis)
 
         logger.info("💡 Generando opciones...")
         options = self.response_generator.generate_response(
@@ -246,6 +252,31 @@ class Closer:
             "sentiments": [entry],
             "fragments": [entry],
             "personality_insight": "Análisis de sentimiento omitido; usando contexto neutro.",
+        }
+
+    def _process_with_simple_pipeline(self, incoming_text: str, sentiment_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Genera la respuesta usando la ruta simplificada de un solo prompt.
+        """
+        logger.info("⚡ Simple pipeline habilitado: usando un solo prompt en lugar de todas las herramientas.")
+        result = self.simple_pipeline.generate(self.context)
+        response_text = result.get("response", "")
+        evaluation = {
+            "mosfet": result.get("mosfet", "directa"),
+            "response": response_text,
+        }
+        self.context.add_message("agente", response_text)
+
+        logger.info("✅ Procesamiento completado (simple pipeline)")
+        return {
+            "input_text": incoming_text,
+            "sentiment_analysis": sentiment_analysis,
+            "stage": self.context.stage,
+            "options_generated": [],
+            "evaluation": evaluation,
+            "original_response": response_text,
+            "adapted_response": response_text,
+            "context": self.context.to_dict()
         }
 
     # -----------------------------------------------------------------

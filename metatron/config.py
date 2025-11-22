@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
     reload: bool = Field(default=True, alias="RELOAD")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    use_simple_pipeline: bool = Field(default=False, alias="USE_SIMPLE_PIPELINE")
     
     model_config = {
         "env_file": ".env",
@@ -98,6 +99,7 @@ def load_settings() -> Settings:
     print(Fore.YELLOW + f"MiniMax TTS Model: {settings.minimax_tts_model}")
     print(Fore.YELLOW + f"MiniMax Voice ID: {settings.minimax_voice_id}")
     print(Fore.YELLOW + f"ElevenLabs API Key: {'***' if settings.elevenlabs_api_key else 'Not set'}\n")
+    print(Fore.YELLOW + f"Use Simple Pipeline: {settings.use_simple_pipeline}")
 
     return settings
 
