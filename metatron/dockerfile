@@ -17,7 +17,7 @@ WORKDIR /app/metatron
 COPY . .
 
 # Install dependencies + local package
-RUN uv sync --frozen --no-cache
+RUN uv sync --frozen
 
 # Create files directory
 RUN mkdir -p /app/metatron/files
