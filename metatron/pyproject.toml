@@ -9,3 +9,12 @@ dependencies = [
     "transformers>=4.57.1",
     "typer>=0.20.0",
 ]
+
+[project.scripts]
+metatron = "metatron.cli.__main__:main"
+
+[tool.setuptools]
+packages = { find = { where = ["."], include = ["agents*", "cli*"] } }
+
+[tool.uv]
+package = true

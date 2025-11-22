@@ -4,9 +4,9 @@ from typing import Any, Dict, Optional
 import typer
 
 try:  # Support both installed package and local execution via `python -m cli`
-    from metatron.agents.main import run_agent_interaction
+    from metatron.agents.closer import run_agent_interaction
 except ModuleNotFoundError:  # pragma: no cover - dev fallback
-    from agents.main import run_agent_interaction  # type: ignore
+    from agents.closer import run_agent_interaction  # type: ignore
 
 app = typer.Typer()
 

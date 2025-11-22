@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+agents/__init__.py
+agents/closer.py
+cli/__main__.py
+cli/main.py
+metatron.egg-info/PKG-INFO
+metatron.egg-info/SOURCES.txt
+metatron.egg-info/dependency_links.txt
+metatron.egg-info/entry_points.txt
+metatron.egg-info/requires.txt
+metatron.egg-info/top_level.txt

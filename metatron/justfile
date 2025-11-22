@@ -1,0 +1,3 @@
+# Run the ping command
+ping:
+    uv run python -m cli ping
