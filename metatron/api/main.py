@@ -4,8 +4,12 @@ FastAPI route definitions.
 
 from __future__ import annotations
 
+import asyncio
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, Request
+import subprocess
+import sys
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 
 from ..config import settings
@@ -18,6 +22,8 @@ from ..schemas import (
     RoomResponse,
     RoomInfo,
     ListRoomsResponse,
+    InsertAgentRequest,
+    InsertAgentResponse,
 )
 # from ..services import ContextService  # TODO: Implement services
 from ..utils.file_reader import (
@@ -208,45 +214,48 @@ async def create_room(request: CreateRoomRequest) -> RoomResponse:
             settings.livekit_api_secret,
         )
         
-        # Create or get room
-        room_info = await lk_api.room.create_room(
-            livekit_api.CreateRoomRequest(
-                name=room_name,
-                empty_timeout=300,  # 5 minutes
-                max_participants=2,  # 1 customer + 1 agent
+        try:
+            # Create or get room
+            room_info = await lk_api.room.create_room(
+                livekit_api.CreateRoomRequest(
+                    name=room_name,
+                    empty_timeout=300,  # 5 minutes
+                    max_participants=2,  # 1 customer + 1 agent
+                )
             )
-        )
-        
-        logger.info(f"Room created/retrieved: {room_name}")
-        
-        # Generate access token for participant
-        token = livekit_api.AccessToken(
-            settings.livekit_api_key,
-            settings.livekit_api_secret
-        )
-        token.with_identity(request.participant_name)
-        token.with_name(request.participant_name)
-        token.with_grants(
-            livekit_api.VideoGrants(
-                room_join=True,
-                room=room_name,
-                can_publish=True,
-                can_subscribe=True,
+            
+            logger.info(f"Room created/retrieved: {room_name}")
+            
+            # Generate access token for participant
+            token = livekit_api.AccessToken(
+                settings.livekit_api_key,
+                settings.livekit_api_secret
             )
-        )
-        
-        if request.metadata:
-            token.with_metadata(str(request.metadata))
-        
-        jwt_token = token.to_jwt()
-        
-        logger.info(f"Generated access token for {request.participant_name} in room {room_name}")
-        
-        return RoomResponse(
-            room_name=room_name,
-            token=jwt_token,
-            url=settings.livekit_url
-        )
+            token.with_identity(request.participant_name)
+            token.with_name(request.participant_name)
+            token.with_grants(
+                livekit_api.VideoGrants(
+                    room_join=True,
+                    room=room_name,
+                    can_publish=True,
+                    can_subscribe=True,
+                )
+            )
+            
+            if request.metadata:
+                token.with_metadata(str(request.metadata))
+            
+            jwt_token = token.to_jwt()
+            
+            logger.info(f"Generated access token for {request.participant_name} in room {room_name}")
+            
+            return RoomResponse(
+                room_name=room_name,
+                token=jwt_token,
+                url=settings.livekit_url
+            )
+        finally:
+            await lk_api.aclose()
         
     except Exception as e:
         logger.error(f"Error creating room: {e}", exc_info=True)
@@ -291,21 +300,142 @@ async def list_rooms() -> ListRoomsResponse:
             settings.livekit_api_secret,
         )
         
-        rooms = await lk_api.room.list_rooms(livekit_api.ListRoomsRequest())
-        
-        return ListRoomsResponse(
-            rooms=[
-                RoomInfo(
-                    name=room.name,
-                    num_participants=room.num_participants,
-                    creation_time=room.creation_time,
-                )
-                for room in rooms
-            ]
-        )
+        try:
+            rooms_response = await lk_api.room.list_rooms(livekit_api.ListRoomsRequest())
+            
+            return ListRoomsResponse(
+                rooms=[
+                    RoomInfo(
+                        name=room.name,
+                        num_participants=room.num_participants,
+                        creation_time=room.creation_time,
+                    )
+                    for room in rooms_response.rooms
+                ]
+            )
+        finally:
+            await lk_api.aclose()
     except Exception as e:
         logger.error(f"Error listing rooms: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to list rooms: {str(e)}")
+
+
+@router.post(
+    "/rooms/{room_name}/agent",
+    response_model=InsertAgentResponse,
+    summary="Insert voice agent into room",
+    description="Insert the Metatron voice agent into an existing LiveKit room",
+    tags=["LiveKit"],
+    responses={
+        200: {"description": "Agent inserted successfully"},
+        404: {"description": "Room not found"},
+        500: {"description": "Internal Server Error"},
+        503: {"description": "LiveKit not configured"},
+    },
+)
+async def insert_agent(
+    room_name: str,
+    background_tasks: BackgroundTasks
+) -> InsertAgentResponse:
+    """
+    Insert the Metatron voice agent into a LiveKit room.
+    
+    This endpoint will:
+    1. Verify the room exists
+    2. Start the voice agent in the background
+    3. The agent will join the room and begin processing conversations
+    
+    Args:
+        room_name: Name of the room to join
+        background_tasks: FastAPI background tasks for async agent startup
+    
+    Returns:
+        InsertAgentResponse with success status
+    """
+    if not LIVEKIT_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit SDK not installed"
+        )
+    
+    if not settings.livekit_url or not settings.livekit_api_key or not settings.livekit_api_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit not configured"
+        )
+    
+    try:
+        # Verify room exists
+        lk_api = livekit_api.LiveKitAPI(
+            settings.livekit_url,
+            settings.livekit_api_key,
+            settings.livekit_api_secret,
+        )
+        
+        try:
+            rooms_response = await lk_api.room.list_rooms(livekit_api.ListRoomsRequest())
+            room_exists = any(room.name == room_name for room in rooms_response.rooms)
+            
+            if not room_exists:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Room '{room_name}' not found"
+                )
+        finally:
+            await lk_api.aclose()
+        
+        logger.info(f"Request to insert voice agent into room: {room_name}")
+        
+        async def start_agent_process():
+            """Background task to start the voice agent as a subprocess"""
+            try:
+                # Get the path to the metatron package
+                metatron_path = Path(__file__).parent.parent
+                
+                # Start the voice agent as a subprocess
+                logger.info(f"Starting voice agent worker for room: {room_name}")
+                
+                # Use uv run to execute the voice agent
+                process = subprocess.Popen(
+                    ["uv", "run", "python", "-m", "metatron.agents.voice_agent"],
+                    cwd=metatron_path.parent,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                logger.info(f"Voice agent worker started with PID: {process.pid}")
+                
+                # Wait a bit to check if it started successfully
+                await asyncio.sleep(2)
+                
+                if process.poll() is not None:
+                    # Process already terminated
+                    stdout, stderr = process.communicate()
+                    logger.error(f"Voice agent failed to start: {stderr}")
+                else:
+                    logger.info(f"Voice agent worker running successfully for room: {room_name}")
+                    
+            except Exception as e:
+                logger.error(f"Error starting voice agent process: {e}", exc_info=True)
+        
+        # Start the agent in the background
+        background_tasks.add_task(start_agent_process)
+        
+        return InsertAgentResponse(
+            success=True,
+            room_name=room_name,
+            message=f"Voice agent worker is starting for room '{room_name}'. The agent will join automatically."
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error inserting agent: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to insert agent: {str(e)}"
+        )
 
 
 @router.delete(

@@ -68,3 +68,15 @@ class RoomInfo(BaseModel):
 class ListRoomsResponse(BaseModel):
     """Response schema for listing rooms."""
     rooms: list[RoomInfo] = Field(..., description="List of active rooms")
+
+
+class InsertAgentRequest(BaseModel):
+    """Request schema for inserting an agent into a room."""
+    room_name: str = Field(..., description="Name of the room to join")
+
+
+class InsertAgentResponse(BaseModel):
+    """Response schema for agent insertion."""
+    success: bool = Field(..., description="Whether the agent was successfully inserted")
+    room_name: str = Field(..., description="Name of the room")
+    message: str = Field(..., description="Status message")
