@@ -380,11 +380,15 @@ def complete_pipeline(
     # Step 2: Generate options using sentiment analysis with tool selection
     typer.echo("\n🔄 Paso 2: Generando opciones de respuesta basadas en sentimiento...\n")
     generator = ResponseGenerator(openai_api_key=api_key)
+    conversation_history = [
+        {"role": "cliente", "content": text}
+    ]
     options = generator.generate_response(
         sentiment_analysis=sentiment_result,
         client_context=client_data,
         product_context=product_data,
-        stage=stage
+        stage=stage,
+        conversation_context={"conversation_history": conversation_history},
     )
 
     typer.echo("📋 Opciones generadas:")
@@ -394,10 +398,6 @@ def complete_pipeline(
     # Step 3: Evaluate options
     typer.echo("\n🔄 Paso 3: Evaluando mejor opción...\n")
     
-    conversation_history = [
-        {"role": "cliente", "content": text}
-    ]
-
     evaluator = Evaluator(openai_api_key=api_key)
     eval_result = evaluator.evaluate(conversation_history=conversation_history, options=options)
 

@@ -192,7 +192,8 @@ class Closer:
             sentiment_analysis=sentiment_analysis,
             client_context=self.context.client_profile,
             product_context=self.context.product_info,
-            stage=self.context.stage
+            stage=self.context.stage,
+            conversation_context=self.context,
         )
 
         # -----------------------------------------------------------------
@@ -219,6 +220,12 @@ class Closer:
         # -----------------------------------------------------------------
 
         logger.info("✅ Procesamiento completado")
+        try:
+            context_snapshot = json.dumps(self.context.to_dict(), indent=2, ensure_ascii=False)
+            logger.info("📚 Contexto completo de la conversación:")
+            logger.info(context_snapshot)
+        except Exception as e:
+            logger.warning(f"⚠️ No se pudo imprimir el contexto completo: {e}")
 
         return {
             "input_text": incoming_text,
