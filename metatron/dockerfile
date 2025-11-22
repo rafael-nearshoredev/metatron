@@ -29,7 +29,7 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/metatron/.venv/bin:$PATH" \
-    PYTHONPATH="/app/metatron:$PYTHONPATH"
+    PYTHONPATH="/app:$PYTHONPATH"
 
-# Run FastAPI app
-CMD ["uv", "run", "python", "-m", "uvicorn", "metatron.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run FastAPI app using the run.py script
+CMD ["python", "run.py"]

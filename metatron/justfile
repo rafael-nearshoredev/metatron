@@ -1,3 +1,11 @@
+# Run the API server
+serve:
+    uv run python run.py
+
+# Run the API server with uvicorn directly
+serve-uvicorn:
+    uv run python -m metatron.main
+
 # Run the ping command
 ping:
     uv run python -m cli ping
