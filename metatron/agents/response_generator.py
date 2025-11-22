@@ -53,56 +53,79 @@ class ResponseGenerator:
         self, sentiment_analysis, client_context, product_context, stage
     ) -> str:
         """
-        Selecciona la herramienta más adecuada usando Groq para analizar:
-        - fragmentos negativos o dudas
-        - contexto del cliente
-        - contexto del producto
-        - etapa de venta
-
-        Devuelve el nombre de la herramienta a usar.
-        Optimized for prompt caching: static tool definitions in system message.
+        Selecciona la herramienta más adecuada usando Groq.
+        Ahora se incluye la herramienta 'seduce_lead'.
         """
+
         logger.info("➡️  Seleccionando herramienta usando Groq…")
 
-        # Preparamos la información para el prompt
-        fragments_text = "\n".join([f"- {f['text']} ({f['label']}, {f['score']:.2f})"
-                                    for f in sentiment_analysis.get("sentiments", [])])
+        # Detectar si ya hubo contenido tipo “seducción”
+        fragments = [f['text'].lower() for f in sentiment_analysis.get("sentiments", [])]
+
+        has_seduction_before = any(
+            keyword in frag
+            for frag in fragments
+            for keyword in [
+                "beneficio", "valor", "ideal para ti", "para tu caso", 
+                "alineado contigo", "se adapta a ti", "perfecto para ti"
+            ]
+        )
+
+        logger.info(f"   → ¿Ya se ha mencionado perfil/beneficios antes? {has_seduction_before}")
+
+        # --------------------------------------------------------------------
+        # REGLA: seduce_lead va después de greet_user y solo si no se ha usado antes
+        # --------------------------------------------------------------------
+        if stage == "intro" and not has_seduction_before:
+            # aseguramos que no es un saludo
+            if not any(w in fragments for w in ["hola", "buenas", "saludo"]):
+                logger.info("   → Activando herramienta seduce_lead basándonos en la etapa y contenido.")
+                return "seduce_lead"
+
+        # --------------------------------------------------------------------
+        # PROMPT PARA GROQ
+        # --------------------------------------------------------------------
+
+        fragments_text = "\n".join([
+            f"- {f['text']} ({f['label']}, {f['score']:.2f})"
+            for f in sentiment_analysis.get("sentiments", [])
+        ])
         personality_insight = sentiment_analysis.get("personality_insight", "No disponible")
 
-        # STATIC content (will be cached across requests)
         system_message = """Eres un asistente experto en ventas y análisis de conversación.
-Tu tarea es seleccionar la herramienta más adecuada para generar una respuesta al cliente.
+Tú tarea es seleccionar la herramienta más adecuada.
 
 ### HERRAMIENTAS DISPONIBLES ###
-- greet_user: Saluda al cliente de manera amigable (usar al inicio de la conversación).
-- fix_doubts: Aborda dudas y preocupaciones sobre el producto o precio.
-- add_details: Proporciona más información y detalles sobre el producto.
-- add_scarcity: Genera urgencia o escasez para impulsar el cierre.
-- search_offers: Presenta promociones o descuentos disponibles.
-- close_sale: Cierra la venta siguiendo los próximos pasos definidos (usar cuando el cliente está listo).
-- default_tool: Respuesta por defecto si no se detecta una necesidad específica.
+- greet_user
+- seduce_lead        ← nueva herramienta
+- fix_doubts
+- add_details
+- add_scarcity
+- search_offers
+- close_sale
+- default_tool
 
 ### INSTRUCCIONES ###
-1. Analiza los fragmentos y sentimientos del cliente.
-2. Toma en cuenta la etapa del proceso y el contexto del cliente y producto.
-3. Si es el primer mensaje o saludo, usa greet_user.
-4. Si el cliente está listo para comprar o en etapa de cierre, usa close_sale.
-5. Devuelve SOLO el nombre de la herramienta más adecuada.
-6. No agregues explicaciones ni ningún texto adicional."""
+1. Si es inicio de la conversación → greet_user.
+2. Después de greet_user, si NO se ha explicado por qué el producto es ideal para el cliente → seduce_lead.
+3. Si hay dudas → fix_doubts
+4. Si pide más detalles → add_details
+5. Si está listo para cerrar → close_sale
+6. Devuelve SOLO el nombre de la herramienta.
+"""
 
-        # DYNAMIC content (changes per request)
-        user_message = f"""### INFORMACIÓN ACTUAL ###
-- Etapa del proceso: {stage}
-- Contexto del cliente: {client_context}
-- Contexto del producto: {product_context}
+        user_message = f"""### INFORMACIÓN ###
+- Etapa: {stage}
+- Cliente: {client_context}
+- Producto: {product_context}
 
-### ANÁLISIS DE SENTIMIENTO ###
+### SENTIMIENTO ###
 {fragments_text}
 
-### INSIGHT DE PERSONALIDAD ###
+### PERSONALIDAD ###
 {personality_insight}
 
-Selecciona la herramienta adecuada:"""
+Selecciona herramienta:"""
 
         response = self.client.chat.completions.create(
             model=self.model,
@@ -110,26 +133,69 @@ Selecciona la herramienta adecuada:"""
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message}
             ],
-            temperature=0.01  # Groq minimum
+            temperature=0.01
         )
 
-        # Log cache usage
-        if hasattr(response, 'usage') and response.usage:
-            prompt_tokens = response.usage.prompt_tokens
-            cached_tokens = getattr(response.usage.prompt_tokens_details, 'cached_tokens', 0) if hasattr(response.usage, 'prompt_tokens_details') else 0
-            cache_hit_rate = (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0
-            logger.info(f"   → Cache: {cached_tokens}/{prompt_tokens} tokens ({cache_hit_rate:.1f}% hit)")
-
         tool_name = response.choices[0].message.content.strip()
-        logger.info(f"   → Herramienta seleccionada por Groq: {tool_name}")
 
-        # Validar que sea una herramienta conocida
-        valid_tools = ["greet_user", "fix_doubts", "add_details", "add_scarcity", "search_offers", "close_sale", "default_tool"]
+        valid_tools = [
+            "greet_user", "seduce_lead", "fix_doubts", "add_details",
+            "add_scarcity", "search_offers", "close_sale", "default_tool"
+        ]
+
         if tool_name not in valid_tools:
-            logger.warning(f"Groq devolvió un nombre de herramienta inválido: {tool_name}. Usando default_tool.")
+            logger.warning(f"Herramienta inválida: {tool_name}. Usando default_tool.")
             tool_name = "default_tool"
 
         return tool_name
+
+
+    # ------------------------------------------------------
+    # NUEVA HERRAMIENTA: seduce_lead
+    # ------------------------------------------------------
+    def seduce_lead(self, sentiment_analysis, client_context, product_context, stage):
+        """
+        Conecta el producto con el perfil del cliente mostrando beneficios,
+        ventajas claras y por qué es ideal para él.
+        Debe ser persuasivo pero conversacional.
+        """
+
+        system_msg = f"""
+Eres un vendedor persuasivo. Tu objetivo es "seducir" comercialmente al cliente,
+explicando por qué este producto es perfecto para él.
+
+### DEFINICIÓN DE SEDUCIR AQUÍ ###
+- No es sexual.
+- Es resaltar beneficios.
+- Conectar el producto con el cliente.
+- Mostrar por qué le conviene.
+- Ser cálido, claro y convincente.
+
+### INSTRUCCIONES ###
+Genera exactamente 3 opciones en JSON:
+- directa: vende el beneficio principal directo
+- consultiva: explora su necesidad y cómo encaja
+- empatica: resalta comprensión del cliente + beneficio clave
+
+NO repitas beneficios si ya se dijeron previamente.
+NO inventes beneficios que no están en el contexto.
+
+### CONTEXTO DEL PRODUCTO ###
+{product_context}
+
+### CONTEXTO DEL CLIENTE ###
+{client_context}
+
+Devuelve solo JSON.
+"""
+
+        fragments = [f['text'] for f in sentiment_analysis.get("sentiments", [])]
+        user_msg = f"""### Fragmentos previos ###
+{fragments}
+
+Genera las 3 opciones:"""
+
+        return self._call_openai(system_msg, user_msg)
 
     # ---------------------------
     # Herramientas / técnicas de venta
@@ -140,8 +206,6 @@ Selecciona la herramienta adecuada:"""
         """
         system_msg = f"""Eres un asistente experto en ventas. El cliente tiene dudas o preocupaciones.
 
-
-
 ### INSTRUCCIONES ###
 Genera 3 opciones de respuesta persuasivas. Responde concretamente la pregunta del cliente y menciona como eso le puede generar valor usando el contexto del cliente
 Devuelve JSON exacto con 3 opciones usando estos IDs: directa, consultiva, empatica.
@@ -149,13 +213,9 @@ Devuelve JSON exacto con 3 opciones usando estos IDs: directa, consultiva, empat
 ### INFORMACIÓN DEL PRODUCTO ###
 {product_context}
 
-##CONTEXTO DEL CLIENTE
-
- {client_context}
-
+### CONTEXTO DEL CLIENTE ###
+{client_context}
 """
-     
-        
 
         user_msg = f"""### FRAGMENTOS CON PROBLEMAS ###
 {[f['text'] for f in sentiment_analysis.get('sentiments', []) if f['label'] in ('NEG','NEU')]}

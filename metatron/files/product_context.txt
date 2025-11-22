@@ -1,7 +1,7 @@
-Programa 30X - Formación de Emprendimiento
+Tutoria desde la hackaton - Formación de Emprendimiento
 
 Descripción:
-30X es un programa intensivo de formación en emprendimiento diseñado para ayudar a emprendedores latinoamericanos a lanzar y escalar sus startups. El programa combina mentoría personalizada, acceso a inversores y una comunidad activa de founders.
+Tutoria desde la hackaton es un programa intensivo de formación en emprendimiento diseñado para ayudar a emprendedores latinoamericanos a lanzar y escalar sus startups. El programa combina mentoría personalizada, acceso a inversores y una comunidad activa de founders.
 
 Características principales:
 - Duración: 12 semanas de formación intensiva
