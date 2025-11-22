@@ -6,6 +6,10 @@ ping:
 adapt TEXT:
     uv run python -m cli adapt "{{TEXT}}"
 
+# Analyze sentiment and personality of client text
+sentiment TEXT:
+    uv run python -m cli sentiment "{{TEXT}}"
+
 # Run the interact command with default parameters
 interact TEXT:
     uv run python -m cli interact "{{TEXT}}"
@@ -21,3 +25,51 @@ interact-full TEXT STAGE PERSONALITY CLIENT_PROFILE PRODUCT_INFO:
 # Evaluate three response options with the Evaluator
 evaluate OPTION_A OPTION_B OPTION_C:
     uv run python -m cli evaluate --option-a "{{OPTION_A}}" --option-b "{{OPTION_B}}" --option-c "{{OPTION_C}}"
+
+# Generate 3 response options based on client context (basic)
+generate TEXT:
+    uv run python -m cli generate "{{TEXT}}"
+
+# Generate with custom sentiment and stage
+generate-custom TEXT SENTIMENT STAGE:
+    uv run python -m cli generate "{{TEXT}}" --sentiment {{SENTIMENT}} --stage "{{STAGE}}"
+
+# Generate with full context (client and product profiles)
+generate-full TEXT SENTIMENT STAGE CLIENT_PROFILE PRODUCT_INFO:
+    uv run python -m cli generate "{{TEXT}}" --sentiment {{SENTIMENT}} --stage "{{STAGE}}" --client-profile '{{CLIENT_PROFILE}}' --product-info '{{PRODUCT_INFO}}'
+
+# Generate options and evaluate them in one command (basic)
+gen-eval TEXT:
+    uv run python -m cli generate-and-evaluate "{{TEXT}}"
+
+# Generate and evaluate with custom sentiment and stage
+gen-eval-custom TEXT SENTIMENT STAGE:
+    uv run python -m cli generate-and-evaluate "{{TEXT}}" --sentiment {{SENTIMENT}} --stage "{{STAGE}}"
+
+# Generate and evaluate with full context
+gen-eval-full TEXT SENTIMENT STAGE CLIENT_PROFILE PRODUCT_INFO:
+    uv run python -m cli generate-and-evaluate "{{TEXT}}" --sentiment {{SENTIMENT}} --stage "{{STAGE}}" --client-profile '{{CLIENT_PROFILE}}' --product-info '{{PRODUCT_INFO}}'
+
+# Full pipeline: generate -> evaluate -> adapt to personality (basic)
+pipeline TEXT:
+    uv run python -m cli full-pipeline "{{TEXT}}"
+
+# Full pipeline with custom sentiment and stage
+pipeline-custom TEXT SENTIMENT STAGE:
+    uv run python -m cli full-pipeline "{{TEXT}}" --sentiment {{SENTIMENT}} --stage "{{STAGE}}"
+
+# Full pipeline with all context
+pipeline-full TEXT SENTIMENT STAGE CLIENT_PROFILE PRODUCT_INFO:
+    uv run python -m cli full-pipeline "{{TEXT}}" --sentiment {{SENTIMENT}} --stage "{{STAGE}}" --client-profile '{{CLIENT_PROFILE}}' --product-info '{{PRODUCT_INFO}}'
+
+# Complete pipeline with sentiment analysis: sentiment → generate → evaluate → adapt (basic)
+complete TEXT:
+    uv run python -m cli complete-pipeline "{{TEXT}}"
+
+# Complete pipeline with custom stage
+complete-custom TEXT STAGE:
+    uv run python -m cli complete-pipeline "{{TEXT}}" --stage "{{STAGE}}"
+
+# Complete pipeline with all context
+complete-full TEXT STAGE CLIENT_PROFILE PRODUCT_INFO:
+    uv run python -m cli complete-pipeline "{{TEXT}}" --stage "{{STAGE}}" --client-profile '{{CLIENT_PROFILE}}' --product-info '{{PRODUCT_INFO}}'
