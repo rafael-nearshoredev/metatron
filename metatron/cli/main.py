@@ -569,3 +569,101 @@ def interact(
 
     typer.echo("Mensaje final sugerido:\n")
     typer.echo(result["message"])
+
+
+@app.command(name="voice-worker", help="Inicia el worker de voz de LiveKit")
+def start_voice_worker():
+    """
+    Start the LiveKit voice agent worker.
+    This worker will join LiveKit rooms and handle voice conversations.
+    """
+    try:
+        from metatron.agents.voice_agent import run_voice_worker
+        from metatron.config import settings
+    except ImportError:
+        from agents.voice_agent import run_voice_worker  # type: ignore
+        from config import settings  # type: ignore
+    
+    typer.echo("=" * 80)
+    typer.echo("🎙️  METATRON VOICE WORKER")
+    typer.echo("=" * 80)
+    
+    # Validate configuration
+    if not settings.livekit_url:
+        typer.echo("\n❌ Error: LIVEKIT_URL not configured", err=True)
+        typer.echo("Please set LIVEKIT_URL in your .env file", err=True)
+        raise typer.Exit(code=1)
+    
+    if not settings.livekit_api_key or not settings.livekit_api_secret:
+        typer.echo("\n❌ Error: LiveKit credentials not configured", err=True)
+        typer.echo("Please set LIVEKIT_API_KEY and LIVEKIT_API_SECRET in your .env file", err=True)
+        raise typer.Exit(code=1)
+    
+    if not settings.openai_api_key:
+        typer.echo("\n❌ Error: OPENAI_API_KEY not configured", err=True)
+        typer.echo("OpenAI is required for Whisper STT. Please set OPENAI_API_KEY in your .env file", err=True)
+        raise typer.Exit(code=1)
+    
+    if not settings.minimax_api_key or not settings.minimax_group_id:
+        typer.echo("\n❌ Error: MiniMax credentials not configured", err=True)
+        typer.echo("Please set MINIMAX_API_KEY and MINIMAX_GROUP_ID in your .env file", err=True)
+        raise typer.Exit(code=1)
+    
+    typer.echo(f"\n✓ LiveKit URL: {settings.livekit_url}")
+    typer.echo(f"✓ OpenAI API: Configured")
+    typer.echo(f"✓ MiniMax API: Configured")
+    typer.echo(f"✓ Groq API: {'Configured' if settings.groq_api_key else 'Not set'}")
+    typer.echo("\nWaiting for connections...\n")
+    
+    try:
+        run_voice_worker()
+    except KeyboardInterrupt:
+        typer.echo("\n\n👋 Voice worker stopped.")
+    except Exception as e:
+        typer.echo(f"\n❌ Error: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command(name="api-server", help="Inicia el servidor API de FastAPI")
+def start_api_server(
+    host: Optional[str] = typer.Option(None, help="Host override (default from config)"),
+    port: Optional[int] = typer.Option(None, help="Port override (default from config)"),
+):
+    """
+    Start the FastAPI server for room management and context APIs.
+    This is an alternative to running 'python -m metatron.main'.
+    """
+    try:
+        from metatron.config import settings
+        from metatron.main import app
+    except ImportError:
+        from config import settings  # type: ignore
+        from main import app  # type: ignore
+    
+    import uvicorn
+    
+    host = host or settings.host
+    port = port or settings.port
+    
+    typer.echo("=" * 80)
+    typer.echo("🚀 METATRON API SERVER")
+    typer.echo("=" * 80)
+    typer.echo(f"\nServer: http://{host}:{port}")
+    typer.echo(f"Docs: http://{host}:{port}/docs")
+    typer.echo(f"Redoc: http://{host}:{port}/redoc")
+    typer.echo(f"Health: http://{host}:{port}/ping\n")
+    
+    typer.echo("Available endpoints:")
+    typer.echo("  - GET  /ping - Health check")
+    typer.echo("  - GET  /context/{type} - Get context content")
+    typer.echo("  - PUT  /context/{type} - Update context content")
+    typer.echo("  - POST /rooms/create - Create LiveKit room")
+    typer.echo("  - GET  /rooms - List active rooms")
+    typer.echo("  - DELETE /rooms/{name} - Delete a room\n")
+    
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level=settings.log_level.lower(),
+    )

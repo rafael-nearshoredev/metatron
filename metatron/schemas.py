@@ -41,3 +41,30 @@ class GetContextResponse(BaseModel):
     """Response schema for getting context content."""
     context_type: ContextType = Field(..., description="Type of context")
     content: str = Field(..., description="Plain text content of the context file")
+
+
+# LiveKit room schemas
+class CreateRoomRequest(BaseModel):
+    """Request schema for creating a LiveKit room."""
+    room_name: Optional[str] = Field(default=None, description="Name of the room (auto-generated if not provided)")
+    participant_name: str = Field(default="Guest", description="Name of the participant")
+    metadata: Optional[dict] = Field(default=None, description="Optional metadata for the room")
+
+
+class RoomResponse(BaseModel):
+    """Response schema for LiveKit room creation."""
+    room_name: str = Field(..., description="Name of the created room")
+    token: str = Field(..., description="JWT token for joining the room")
+    url: str = Field(..., description="LiveKit server URL")
+
+
+class RoomInfo(BaseModel):
+    """Information about a LiveKit room."""
+    name: str = Field(..., description="Room name")
+    num_participants: int = Field(..., description="Number of participants in the room")
+    creation_time: int = Field(..., description="Room creation timestamp")
+
+
+class ListRoomsResponse(BaseModel):
+    """Response schema for listing rooms."""
+    rooms: list[RoomInfo] = Field(..., description="List of active rooms")
