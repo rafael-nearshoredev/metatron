@@ -69,18 +69,18 @@ class Closer:
         Args:
             load_context_from_files: Si True, carga el contexto desde los archivos de configuración
         """
-        # Validar que existe la API key
-        if not settings.openai_api_key:
+        # Validar que existe la API key de Groq
+        if not settings.groq_api_key:
             raise ValueError(
-                "OPENAI_API_KEY no está configurada. "
-                "Por favor configura la variable de entorno OPENAI_API_KEY en tu archivo .env"
+                "GROQ_API_KEY no está configurada. "
+                "Por favor configura la variable de entorno GROQ_API_KEY en tu archivo .env"
             )
         
-        # Inicializar agentes con la API key de settings
-        self.sentiment_analyst = SentimentAnalyst(openai_api_key=settings.openai_api_key)
-        self.response_generator = ResponseGenerator(openai_api_key=settings.openai_api_key)
-        self.evaluator = Evaluator(openai_api_key=settings.openai_api_key)
-        self.personality_adapter = PersonalityAdapter(openai_api_key=settings.openai_api_key)
+        # Inicializar agentes con la API key de Groq desde settings
+        self.sentiment_analyst = SentimentAnalyst(openai_api_key=settings.groq_api_key)
+        self.response_generator = ResponseGenerator(openai_api_key=settings.groq_api_key)
+        self.evaluator = Evaluator(openai_api_key=settings.groq_api_key)
+        self.personality_adapter = PersonalityAdapter(openai_api_key=settings.groq_api_key)
         self.context = GlobalConversationContext()
         
         # Cargar contexto desde archivos si está habilitado
@@ -218,7 +218,7 @@ def run_agent_interaction(
     usa directamente la clase Closer.
     
     El parámetro openai_api_key se mantiene por compatibilidad pero ya no se usa.
-    La API key se obtiene de settings (config.py).
+    La API key de Groq se obtiene de settings (config.py).
     """
     closer = Closer()
     result = closer.process_message(

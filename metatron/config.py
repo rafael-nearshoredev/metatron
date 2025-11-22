@@ -14,11 +14,13 @@ class Settings(BaseSettings):
     """
 
     environment: str = Field(default="development", alias="ENVIRONMENT")
-    livekit_project_id: Optional[str] = Field(default=None, alias="LIVEKIT_PROJECT_ID")
-    livekit_url: Optional[str] = Field(default=None, alias="LIVEKIT_URL")
-    livekit_api_key: Optional[str] = Field(default=None, alias="LIVEKIT_API_KEY")
-    livekit_api_secret: Optional[str] = Field(default=None, alias="LIVEKIT_API_SECRET")
-    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    # livekit_project_id: Optional[str] = Field(default=None, alias="LIVEKIT_PROJECT_ID")
+    # livekit_url: Optional[str] = Field(default=None, alias="LIVEKIT_URL")
+    # livekit_api_key: Optional[str] = Field(default=None, alias="LIVEKIT_API_KEY")
+    # livekit_api_secret: Optional[str] = Field(default=None, alias="LIVEKIT_API_SECRET")
+    groq_api_key: Optional[str] = Field(default=None, alias="GROQ_API_KEY")
+    groq_base_url: str = Field(default="https://api.groq.com/openai/v1", alias="GROQ_BASE_URL")
+    groq_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL")
     host: str = Field(default="0.0.0.0", alias="HOST")
     port: int = Field(default=5885, alias="PORT")
     debug: bool = Field(default=True, alias="DEBUG")
@@ -63,7 +65,8 @@ def load_settings() -> Settings:
         f"--> Environment: {settings.environment if settings.environment else 'Not set'} "
         f"Server: {settings.host}:{settings.port}"
     )
-    print(Fore.YELLOW + f"LiveKit Project ID: {'***' if settings.livekit_project_id else 'Not set'}\n")
+    print(Fore.YELLOW + f"Groq API Key: {'***' if settings.groq_api_key else 'Not set'}")
+    print(Fore.YELLOW + f"Groq Model: {settings.groq_model}\n")
 
     return settings
 

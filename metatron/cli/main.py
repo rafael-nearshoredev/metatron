@@ -46,12 +46,12 @@ def adapt_text(
         None,
         "--api-key",
         "-k",
-        envvar="OPENAI_API_KEY",
-        help="Clave de OpenAI (por defecto toma la variable OPENAI_API_KEY).",
+        envvar="GROQ_API_KEY",
+        help="Clave de Groq (por defecto toma la variable GROQ_API_KEY).",
     ),
 ):
     if not api_key:
-        typer.echo("OPENAI_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
+        typer.echo("GROQ_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
         raise typer.Exit(code=1)
 
     adapter = PersonalityAdapter(openai_api_key=api_key)
@@ -66,12 +66,12 @@ def analyze_sentiment(
         None,
         "--api-key",
         "-k",
-        envvar="OPENAI_API_KEY",
-        help="Clave de OpenAI (por defecto toma la variable OPENAI_API_KEY).",
+        envvar="GROQ_API_KEY",
+        help="Clave de Groq (por defecto toma la variable GROQ_API_KEY).",
     ),
 ):
     if not api_key:
-        typer.echo("OPENAI_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
+        typer.echo("GROQ_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
         raise typer.Exit(code=1)
 
     analyst = SentimentAnalyst(openai_api_key=api_key)
@@ -105,12 +105,12 @@ def evaluate_options(
         None,
         "--api-key",
         "-k",
-        envvar="OPENAI_API_KEY",
-        help="Clave de OpenAI (por defecto toma la variable OPENAI_API_KEY).",
+        envvar="GROQ_API_KEY",
+        help="Clave de Groq (por defecto toma la variable GROQ_API_KEY).",
     ),
 ):
     if not api_key:
-        typer.echo("OPENAI_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
+        typer.echo("GROQ_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
         raise typer.Exit(code=1)
 
     # Historial fijo para pruebas rápidas en CLI
@@ -150,12 +150,12 @@ def generate_responses(
         None,
         "--api-key",
         "-k",
-        envvar="OPENAI_API_KEY",
-        help="Clave de OpenAI (por defecto toma la variable OPENAI_API_KEY).",
+        envvar="GROQ_API_KEY",
+        help="Clave de Groq (por defecto toma la variable GROQ_API_KEY).",
     ),
 ):
     if not api_key:
-        typer.echo("OPENAI_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
+        typer.echo("GROQ_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
         raise typer.Exit(code=1)
 
     # Parse JSON options
@@ -199,12 +199,12 @@ def generate_and_evaluate(
         None,
         "--api-key",
         "-k",
-        envvar="OPENAI_API_KEY",
-        help="Clave de OpenAI (por defecto toma la variable OPENAI_API_KEY).",
+        envvar="GROQ_API_KEY",
+        help="Clave de Groq (por defecto toma la variable GROQ_API_KEY).",
     ),
 ):
     if not api_key:
-        typer.echo("OPENAI_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
+        typer.echo("GROQ_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
         raise typer.Exit(code=1)
 
     # Parse JSON options
@@ -265,12 +265,12 @@ def full_pipeline(
         None,
         "--api-key",
         "-k",
-        envvar="OPENAI_API_KEY",
-        help="Clave de OpenAI (por defecto toma la variable OPENAI_API_KEY).",
+        envvar="GROQ_API_KEY",
+        help="Clave de Groq (por defecto toma la variable GROQ_API_KEY).",
     ),
 ):
     if not api_key:
-        typer.echo("OPENAI_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
+        typer.echo("GROQ_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
         raise typer.Exit(code=1)
 
     # Parse JSON options
@@ -347,12 +347,12 @@ def complete_pipeline(
         None,
         "--api-key",
         "-k",
-        envvar="OPENAI_API_KEY",
-        help="Clave de OpenAI (por defecto toma la variable OPENAI_API_KEY).",
+        envvar="GROQ_API_KEY",
+        help="Clave de Groq (por defecto toma la variable GROQ_API_KEY).",
     ),
 ):
     if not api_key:
-        typer.echo("OPENAI_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
+        typer.echo("GROQ_API_KEY no está configurada. Usa --api-key o exporta la variable de entorno.", err=True)
         raise typer.Exit(code=1)
 
     # Parse JSON options
@@ -524,7 +524,7 @@ def chat(
                 
     except ValueError as e:
         typer.echo(f"\n❌ Error: {e}", err=True)
-        typer.echo("Por favor configura OPENAI_API_KEY en tu archivo .env", err=True)
+        typer.echo("Por favor configura GROQ_API_KEY en tu archivo .env", err=True)
         raise typer.Exit(code=1)
     except Exception as e:
         typer.echo(f"\n❌ Error inesperado: {e}", err=True)

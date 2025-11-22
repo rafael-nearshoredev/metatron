@@ -11,6 +11,10 @@ from utils.logger import logger
 from utils.file_reader import get_lead_context, get_product_context
 from config import settings
 
+# Groq configuration
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+DEFAULT_MODEL = "openai/gpt-oss-120b"
+
 
 class Evaluator:
     """
@@ -20,8 +24,11 @@ class Evaluator:
     - Seleccionar la mejor opción sin alterar el texto original
     """
 
-    def __init__(self, openai_api_key: str, model="gpt-4o-mini", temperature=0.7):
-        self.client = OpenAI(api_key=openai_api_key)
+    def __init__(self, openai_api_key: str, model=DEFAULT_MODEL, temperature=0.7):
+        self.client = OpenAI(
+            base_url=GROQ_BASE_URL,
+            api_key=openai_api_key
+        )
         self.model = model
         self.temperature = temperature
 
@@ -33,9 +40,10 @@ class Evaluator:
         """
         conversation_history: lista de dicts {"role": "cliente"|"agente", "content": "..."}
         options: lista de dicts {"id": ..., "text": ..., "intent": ...}
+        Optimized for prompt caching: static context in system message.
         """
 
-        logger.info("➡️  Etapa 4: Preparando contexto para OpenAI…")
+        logger.info("➡️  Etapa 4: Preparando contexto para Groq…")
 
         client_info = get_lead_context()
         product_info = get_product_context()
@@ -48,35 +56,56 @@ class Evaluator:
             [f"{o['id']} ({o['intent']}): {o['text']}" for o in options]
         )
 
-        # Prompt: solo pedir el ID de la mejor opción
-        prompt = f"""
-Eres un asistente experto en ventas.
+        # STATIC content (will be cached across requests)
+        system_message = f"""Eres un asistente experto en ventas.
 
-Analiza la conversación completa del cliente, la información del cliente {client_info} y la información del producto {product_info}.
-Luego, revisa estas opciones disponibles:
+### INFORMACIÓN DEL CLIENTE ###
+{client_info}
 
+### INFORMACIÓN DEL PRODUCTO ###
+{product_info}
+
+### INSTRUCCIONES ###
+Tu tarea es analizar la conversación y las opciones de respuesta disponibles.
+Indica cuál es la mejor opción para avanzar hacia el cierre.
+Solo devuelve el ID de la opción que consideres óptima en formato JSON: {{"best_option_id": "<ID>"}}.
+No modifiques el texto de la opción."""
+
+        # DYNAMIC content (changes per request)
+        user_message = f"""### CONVERSACIÓN ###
+{history_text}
+
+### OPCIONES DISPONIBLES ###
 {options_text}
 
-Indica cuál es la mejor opción para avanzar hacia el cierre. Solo devuelve el ID de la opción que consideres óptima en formato JSON:
-{{"best_option_id": "<ID>"}}. No modifiques el texto de la opción.
-"""
+Selecciona la mejor opción:"""
 
-        logger.info("➡️  Etapa 4: Enviando solicitud a OpenAI…")
+        logger.info("➡️  Etapa 4: Enviando solicitud a Groq (optimizado para caching)…")
 
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ],
             temperature=self.temperature
         )
 
+        # Log cache usage
+        if hasattr(response, 'usage') and response.usage:
+            prompt_tokens = response.usage.prompt_tokens
+            cached_tokens = getattr(response.usage.prompt_tokens_details, 'cached_tokens', 0) if hasattr(response.usage, 'prompt_tokens_details') else 0
+            cache_hit_rate = (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0
+            logger.info(f"   → Cache: {cached_tokens}/{prompt_tokens} tokens ({cache_hit_rate:.1f}% hit)")
+
         result_text = response.choices[0].message.content.strip()
-        logger.info("   → Respuesta recibida de OpenAI")
+        logger.info("   → Respuesta recibida de Groq")
 
         try:
             result_json = json.loads(result_text)
             best_option_id = result_json.get("best_option_id")
         except Exception:
-            logger.warning("No se pudo parsear JSON de OpenAI. Se selecciona la primera opción por defecto.")
+            logger.warning("No se pudo parsear JSON de Groq. Se selecciona la primera opción por defecto.")
             best_option_id = options[0]["id"] if options else None
 
         # Buscar la opción original por ID

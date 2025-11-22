@@ -15,9 +15,9 @@ from config import settings
 
 PERSONALITY_PROFILE = get_salesman_context()
 
-MODEL_NAME = "gpt-4o-mini"
-# Note: This global client is initialized at module load time
-# Individual instances should use their own client (see PersonalityAdapter.__init__)
+# Groq model configuration
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+MODEL_NAME = "openai/gpt-oss-120b"
 
 
 
@@ -27,40 +27,54 @@ class PersonalityAdapter:
     """
 
     def __init__(self, openai_api_key: str):
-        logging.info("Initializing Personality Adapter")
-        self.client = OpenAI(api_key=openai_api_key)
+        logging.info("Initializing Personality Adapter with Groq")
+        self.client = OpenAI(
+            base_url=GROQ_BASE_URL,
+            api_key=openai_api_key
+        )
 
     def adapt(self, original_text: str) -> str:
         """
         Rewrite the original text into the desired persona style.
+        Optimized for prompt caching: static content in system message, dynamic in user message.
         """
         logging.info("Starting personality adaptation process")
 
-        prompt = f"""
-Adapta el siguiente texto a la personalidad descrita.
+        # STATIC content (will be cached across requests)
+        system_message = f"""Adapta el siguiente texto a la personalidad descrita.
 
 ### PERSONALIDAD ###
 {PERSONALITY_PROFILE}
-
-### TEXTO ORIGINAL ###
-{original_text}
 
 ### INSTRUCCIONES ###
 - Mantén el significado original.
 - Cambia únicamente estilo, tono y forma de expresarse.
 - NO inventes datos.
 - Responde solamente con el texto final adaptado.
-- Manten los textos consisos
+- Manten los textos consisos"""
 
-Texto final:
-"""
+        # DYNAMIC content (user-specific, changes each request)
+        user_message = f"""### TEXTO ORIGINAL ###
+{original_text}
 
-        logging.info("Sending request to the LLM for rewriting")
+Texto final:"""
+
+        logging.info("Sending request to Groq for rewriting (optimized for caching)")
         response = self.client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ],
             temperature=0.8,
         )
+
+        # Log cache usage
+        if hasattr(response, 'usage') and response.usage:
+            prompt_tokens = response.usage.prompt_tokens
+            cached_tokens = getattr(response.usage.prompt_tokens_details, 'cached_tokens', 0) if hasattr(response.usage, 'prompt_tokens_details') else 0
+            cache_hit_rate = (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0
+            logging.info(f"Cache usage: {cached_tokens}/{prompt_tokens} tokens cached ({cache_hit_rate:.1f}% hit rate)")
 
         logging.info("Received personality-adapted response")
         return response.choices[0].message.content.strip()
