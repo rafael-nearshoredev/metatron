@@ -21,8 +21,8 @@ app = FastAPI(
         "persistAuthorization": True,
         "defaultModelsExpandDepth": -1,
     },
-    title="Video Service API",
-    description="A video processing service with FastAPI",
+    title="Metatron Service API",
+    description="A Metatron service with FastAPI",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
