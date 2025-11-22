@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-ContextName = Literal["salesman", "lead", "product"]
+ContextName = Literal["salesman", "lead", "product", "close"]
 
 _FILES_DIR = Path(__file__).resolve().parent.parent / "files"
 _CONTEXT_FILES = {
@@ -74,9 +74,9 @@ def set_lead_context(content: str) -> None:
 
 def set_product_context(content: str) -> None:
     """Overwrite the product context file."""
+    write_context("product", content)
 
 
 def set_close_context(content: str) -> None:
     """Overwrite the close context file."""
     write_context("close", content)
-    write_context("product", content)

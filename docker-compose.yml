@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: metatron-postgres
+    environment:
+      POSTGRES_USER: metatron
+      POSTGRES_PASSWORD: metatron_password
+      POSTGRES_DB: metatron_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metatron -d metatron_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - metatron-network
+
+  metatron:
+    build:
+      context: ./metatron
+      dockerfile: dockerfile
+    container_name: metatron-service
+    environment:
+      DATABASE_URL: postgresql://metatron:metatron_password@postgres:5432/metatron_db
+      HOST: 0.0.0.0
+      PORT: 8000
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+      RELOAD: "false"
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LIVEKIT_PROJECT_ID: ${LIVEKIT_PROJECT_ID:-}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./metatron/files:/app/metatron/files
+      - ./metatron/.env:/app/metatron/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - metatron-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  metatron-network:
+    driver: bridge
